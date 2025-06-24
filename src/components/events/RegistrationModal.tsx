@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Calendar, Clock, MapPin, CreditCard, CheckCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { formatRussianDate, formatTimeFromTimestamp } from '../../utils/dateTimeUtils';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
+import { syncUserRegistration } from '../../utils/registrationSync';
 import Modal from '../ui/Modal';
 import { EventRegistrations } from '../../pages/admin/constants';
 
@@ -12,7 +14,7 @@ type RegistrationModalProps = {
   event: {
     id: string;
     title: string;
-    start_at: string;  // ИСПРАВЛЕНО: используем start_at вместо start_time
+    start_at: string;
     location: string;
     price: number;
     currency: string;
@@ -28,6 +30,8 @@ type RegistrationModalProps = {
 };
 
 const RegistrationModal = ({ isOpen, onClose, event }: RegistrationModalProps) => {
+  const { user: currentUser } = useAuth();
+  
   const [formData, setFormData] = useState({
     name: '',
     contact: '',
@@ -46,6 +50,17 @@ const RegistrationModal = ({ isOpen, onClose, event }: RegistrationModalProps) =
     childTickets: number;
     total: number;
   } | null>(null);
+
+  // Заполняем данные пользователя при открытии модального окна
+  useEffect(() => {
+    if (isOpen && currentUser) {
+      setFormData(prev => ({
+        ...prev,
+        name: prev.name || currentUser.name || '',
+        contact: prev.contact || currentUser.email || ''
+      }));
+    }
+  }, [isOpen, currentUser]);
 
   const isFreeOrDonation = event.payment_type === 'free' || event.payment_type === 'donation';
   
@@ -157,6 +172,7 @@ const RegistrationModal = ({ isOpen, onClose, event }: RegistrationModalProps) =
         child_tickets: Number(event.adults_only ? 0 : formData.childTickets),
         total_amount: Number(total),
         status: true,
+        qr_code: registrationId, // Используем ID как QR код
         created_at: new Date().toISOString(),
         payment_link_clicked: false,
       };
@@ -184,6 +200,22 @@ const RegistrationModal = ({ isOpen, onClose, event }: RegistrationModalProps) =
 
       const result = await response.json();
 
+      // Если пользователь авторизован, синхронизируем регистрацию с таблицей user_event_registrations
+      if (currentUser) {
+        try {
+          await syncUserRegistration(
+            currentUser.id,
+            event.id,
+            registrationData,
+            isFreeOrDonation ? 'free' : 'pending'
+          );
+          console.log('User registration synced successfully');
+        } catch (syncError) {
+          console.error('Failed to sync user registration:', syncError);
+          // Не показываем ошибку пользователю, так как основная регистрация прошла успешно
+        }
+      }
+
       setRegistrationDetails({
         id: registrationId,
         fullName: formData.name,
@@ -197,7 +229,7 @@ const RegistrationModal = ({ isOpen, onClose, event }: RegistrationModalProps) =
       toast.success('Регистрация успешна!');
     } catch (error) {
       console.error('Registration error:', error);
-      toast.error('Ошибка при регистрации');
+      toast.error('Ошибка при регистрации: ' + (error instanceof Error ? error.message : 'Неизвестная ошибка'));
     } finally {
       setLoading(false);
     }
@@ -208,50 +240,50 @@ const RegistrationModal = ({ isOpen, onClose, event }: RegistrationModalProps) =
     return Array.from({ length: max - start + 1 }, (_, i) => start + i);
   };
 
+  // Сброс формы при закрытии
+  const handleClose = () => {
+    setFormData({
+      name: '',
+      contact: '',
+      phone: '',
+      comment: '',
+      adultTickets: 1,
+      childTickets: 0,
+    });
+    setRegistrationSuccess(false);
+    setRegistrationDetails(null);
+    onClose();
+  };
+
   return (
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={handleClose}
       title={event.title}
       size="md"
     >
       <div className="p-3 space-y-3">
         {registrationSuccess && registrationDetails ? (
-          <div className="text-center space-y-4">
-            <div className="flex justify-center">
-              <CheckCircle className="h-12 w-12 text-green-500" />
+          <div className="text-center py-6 space-y-4">
+            <div className="w-16 h-16 mx-auto bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+              <CheckCircle className="w-10 h-10 text-green-600 dark:text-green-400" />
             </div>
-            <h3 className="text-lg font-semibold">Регистрация подтверждена!</h3>
             
-            <div className="bg-gray-50 dark:bg-gray-700 rounded p-4 space-y-2 text-sm text-left">
-              <div className="flex justify-between">
-                <span>Имя:</span>
-                <span className="font-medium">{registrationDetails.fullName}</span>
+            <div>
+              <h3 className="text-lg font-semibold mb-2">Регистрация успешна!</h3>
+              <div className="text-sm text-gray-600 dark:text-gray-300 space-y-1">
+                <p><strong>Имя:</strong> {registrationDetails.fullName}</p>
+                <p><strong>Email:</strong> {registrationDetails.email}</p>
+                <p><strong>Билеты:</strong> {registrationDetails.adultTickets} взрослых, {registrationDetails.childTickets} детей</p>
+                {registrationDetails.total > 0 && (
+                  <p><strong>Сумма:</strong> {registrationDetails.total} {event.currency}</p>
+                )}
+                <p><strong>ID регистрации:</strong> {registrationDetails.id}</p>
               </div>
-              <div className="flex justify-between">
-                <span>Email:</span>
-                <span className="font-medium">{registrationDetails.email}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Взрослых билетов:</span>
-                <span className="font-medium">{registrationDetails.adultTickets}</span>
-              </div>
-              {!event.adults_only && registrationDetails.childTickets > 0 && (
-                <div className="flex justify-between">
-                  <span>Детских билетов:</span>
-                  <span className="font-medium">{registrationDetails.childTickets}</span>
-                </div>
-              )}
-              {!isFreeOrDonation && (
-                <div className="pt-2 border-t border-gray-200 dark:border-gray-600 font-medium flex justify-between">
-                  <span>Итого:</span>
-                  <span>{registrationDetails.total} {event.currency}</span>
-                </div>
-              )}
             </div>
-
+            
             <button
-              onClick={onClose}
+              onClick={handleClose}
               className="w-full border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 py-2 px-4 rounded text-sm text-gray-700 dark:text-gray-200"
             >
               Закрыть
@@ -259,6 +291,7 @@ const RegistrationModal = ({ isOpen, onClose, event }: RegistrationModalProps) =
           </div>
         ) : (
           <>
+            {/* Информация о мероприятии */}
             <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
               <div className="flex items-center gap-1">
                 <Calendar className="h-4 w-4 text-gray-500 dark:text-gray-400" />
@@ -280,6 +313,7 @@ const RegistrationModal = ({ isOpen, onClose, event }: RegistrationModalProps) =
               )}
             </div>
 
+            {/* Форма регистрации */}
             <form onSubmit={handleSubmit} className="space-y-3">
               <input
                 type="text"
@@ -315,35 +349,29 @@ const RegistrationModal = ({ isOpen, onClose, event }: RegistrationModalProps) =
                 rows={3}
               />
 
+              {/* Выбор количества билетов */}
               {!isFreeOrDonation && (
                 <div className={`flex gap-2 ${event.adults_only ? 'justify-center' : ''}`}>
-                  <div className={event.adults_only ? 'w-1/2' : 'flex-1'}>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Взрослые</div>
+                  <div className={event.adults_only ? 'w-full' : 'flex-1'}>
+                    <label className="block text-xs font-medium mb-1">Взрослых билетов</label>
                     <select
                       value={formData.adultTickets}
-                      onChange={(e) => setFormData({ 
-                        ...formData, 
-                        adultTickets: parseInt(e.target.value), 
-                      })}
-                      className="w-full border border-gray-300 dark:border-gray-600 rounded p-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                      required
+                      onChange={(e) => setFormData({ ...formData, adultTickets: Number(e.target.value) })}
+                      className="w-full border border-gray-300 dark:border-gray-600 rounded p-2 text-sm bg-white dark:bg-gray-700"
                     >
                       {generateOptions(10, 1).map(num => (
                         <option key={num} value={num}>{num}</option>
                       ))}
                     </select>
                   </div>
-                  
+
                   {!event.adults_only && (
                     <div className="flex-1">
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Дети</div>
+                      <label className="block text-xs font-medium mb-1">Детских билетов</label>
                       <select
                         value={formData.childTickets}
-                        onChange={(e) => setFormData({ 
-                          ...formData, 
-                          childTickets: parseInt(e.target.value),
-                        })}
-                        className="w-full border border-gray-300 dark:border-gray-600 rounded p-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        onChange={(e) => setFormData({ ...formData, childTickets: Number(e.target.value) })}
+                        className="w-full border border-gray-300 dark:border-gray-600 rounded p-2 text-sm bg-white dark:bg-gray-700"
                       >
                         {generateOptions(10, 0).map(num => (
                           <option key={num} value={num}>{num}</option>
@@ -354,20 +382,25 @@ const RegistrationModal = ({ isOpen, onClose, event }: RegistrationModalProps) =
                 </div>
               )}
 
+              {/* Детализация цены */}
               {!isFreeOrDonation && (
-                <div className="bg-gray-50 dark:bg-gray-700 rounded p-3 text-sm space-y-2 text-gray-800 dark:text-gray-200">
-                  {getPriceDetails()}
-                  <div className="pt-2 border-t border-gray-200 dark:border-gray-600 font-medium flex justify-between">
-                    <span>Итого:</span>
-                    <span>{calculateTotal()} {event.currency}</span>
+                <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded text-sm">
+                  <h4 className="font-semibold mb-2">Детализация стоимости:</h4>
+                  <div className="space-y-1">
+                    {getPriceDetails()}
+                    <div className="border-t pt-1 mt-2 font-semibold flex justify-between">
+                      <span>Итого:</span>
+                      <span>{calculateTotal()} {event.currency}</span>
+                    </div>
                   </div>
                 </div>
               )}
 
-              <div className="flex gap-2">
+              {/* Кнопки */}
+              <div className="flex gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={onClose}
+                  onClick={handleClose}
                   className="flex-1 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 py-2 px-4 rounded text-sm text-gray-700 dark:text-gray-200"
                 >
                   Отмена
@@ -375,7 +408,7 @@ const RegistrationModal = ({ isOpen, onClose, event }: RegistrationModalProps) =
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded text-sm disabled:opacity-50"
+                  className="flex-1 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white py-2 px-4 rounded text-sm transition-colors"
                 >
                   {loading ? '...' : 'Подтвердить'}
                 </button>
