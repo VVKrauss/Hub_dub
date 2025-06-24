@@ -672,7 +672,7 @@ const ProfilePage = () => {
       {showAvatarSelector && (
         <AvatarSelector
           currentAvatar={profile?.avatar}
-          onAvatarSelect={handleAvatarSelect}
+          onAvatarSelect={handleAvatarSelect}  
           onClose={() => setShowAvatarSelector(false)}
         />
       )}
