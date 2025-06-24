@@ -681,6 +681,112 @@ const ProfilePage = () => {
             </div>
           </div>
 
+
+           {/* QR Code Section */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* QR Code */}
+            <UserQRCode
+              userId={currentUser.id}
+              userName={profile?.name || currentUser.name || currentUser.email?.split('@')[0] || 'Пользователь'}
+              userEmail={currentUser.email}
+            />
+
+            {/* Quick Stats */}
+            <div className="bg-white dark:bg-dark-800 rounded-lg shadow-md overflow-hidden">
+              <div className="bg-gradient-to-r from-green-500 to-green-600 p-4 text-white">
+                <h3 className="text-lg font-semibold">Краткая статистика</h3>
+                <p className="text-green-100 text-sm mt-1">Ваша активность</p>
+              </div>
+              
+              <div className="p-6 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center p-4 bg-gray-50 dark:bg-dark-700 rounded-lg">
+                    <Heart className="h-8 w-8 text-red-500 mx-auto mb-2" />
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                      {favoriteSpeakersData.length + favoriteEventsData.length}
+                    </p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Избранное</p>
+                  </div>
+                  
+                  <div className="text-center p-4 bg-gray-50 dark:bg-dark-700 rounded-lg">
+                    <Calendar className="h-8 w-8 text-blue-500 mx-auto mb-2" />
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                      {profile?.created_at ? Math.floor((Date.now() - new Date(profile.created_at).getTime()) / (1000 * 60 * 60 * 24)) : 0}
+                    </p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Дней с нами</p>
+                  </div>
+                </div>
+
+                <div className="text-center">
+                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 rounded-lg">
+                    <Shield className="h-4 w-4" />
+                    <span className="text-sm font-medium">{profile?.role || 'Гость'}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Attendance History */}
+          <UserAttendanceHistory userId={currentUser.id} />
+
+          {/* Дополнительные функции - обновленная секция */}
+          <div className="bg-white dark:bg-dark-800 rounded-lg shadow-md overflow-hidden">
+            <div className="p-6">
+              <h3 className="text-lg font-medium mb-4 flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Управление аккаунтом
+              </h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-4 border border-gray-200 dark:border-dark-600 rounded-lg">
+                  <h4 className="font-medium mb-2">QR-код для посещений</h4>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                    Покажите ваш QR-код админу для отметки посещения
+                  </p>
+                  <button
+                    onClick={() => {
+                      const qrSection = document.querySelector('[data-qr-section]');
+                      qrSection?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="btn-outline text-sm"
+                  >
+                    Показать QR-код
+                  </button>
+                </div>
+
+                <div className="p-4 border border-gray-200 dark:border-dark-600 rounded-lg">
+                  <h4 className="font-medium mb-2">История активности</h4>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                    Просмотрите историю ваших посещений и активности
+                  </p>
+                  <button
+                    onClick={() => {
+                      const historySection = document.querySelector('[data-history-section]');
+                      historySection?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="btn-outline text-sm"
+                  >
+                    Посмотреть историю
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <h4 className="font-medium text-blue-800 dark:text-blue-200 mb-2">
+                  Как использовать QR-код
+                </h4>
+                <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
+                  <li>• Покажите QR-код администратору на входе</li>
+                  <li>• Код будет отсканирован для отметки вашего посещения</li>
+                  <li>• Все посещения сохраняются в вашей истории</li>
+                  <li>• При необходимости можно обновить QR-код</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          
+
           {/* Заглушка для будущих секций */}
           <div className="bg-white dark:bg-dark-800 rounded-lg shadow-md overflow-hidden">
             <div className="p-6">
