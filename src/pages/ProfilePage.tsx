@@ -23,6 +23,7 @@ type FavoriteSpeaker = {
   name: string;
   description?: string;
   field_of_expertise?: string;
+  photos?: { url: string; isMain?: boolean }[];
 };
 
 type FavoriteEvent = {
@@ -136,7 +137,8 @@ const ProfilePage = () => {
             id,
             name,
             description,
-            field_of_expertise
+            field_of_expertise,
+            photos
           )
         `)
         .eq('user_id', currentUser.id);
@@ -527,27 +529,52 @@ const ProfilePage = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {favoriteSpeakersData.map((speaker) => (
                     <div key={speaker.id} className="border border-gray-200 dark:border-dark-700 rounded-lg p-4 hover:shadow-md transition-shadow">
-                      <div className="flex justify-between items-start mb-2">
-                        <Link
-                          to={`/speakers/${speaker.id}`}
-                          className="font-medium text-primary-600 dark:text-primary-400 hover:underline"
-                        >
-                          {speaker.name}
-                        </Link>
+                      <div className="flex justify-between items-start mb-3">
+                        <div className="flex items-start gap-3 flex-1">
+                          {/* Фото спикера */}
+                          <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-200 dark:bg-dark-700 flex-shrink-0">
+                            {speaker.photos?.[0]?.url ? (
+                              <img
+                                src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/images/${speaker.photos[0].url}`}
+                                alt={speaker.name}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  // Fallback to default icon if image fails to load
+                                  const target = e.target as HTMLImageElement;
+                                  target.style.display = 'none';
+                                }}
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <User className="h-6 w-6 text-gray-400" />
+                              </div>
+                            )}
+                          </div>
+                          
+                          <div className="flex-1 min-w-0">
+                            <Link
+                              to={`/speakers/${speaker.id}`}
+                              className="font-medium text-primary-600 dark:text-primary-400 hover:underline block"
+                            >
+                              {speaker.name}
+                            </Link>
+                            
+                            {speaker.field_of_expertise && (
+                              <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+                                {speaker.field_of_expertise}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        
                         <button
                           onClick={() => removeFavoriteSpeaker(speaker.id)}
-                          className="text-red-500 hover:text-red-700 p-1"
+                          className="text-red-500 hover:text-red-700 p-1 flex-shrink-0"
                           title="Удалить из избранного"
                         >
                           <X className="h-4 w-4" />
                         </button>
                       </div>
-                      
-                      {speaker.field_of_expertise && (
-                        <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
-                          {speaker.field_of_expertise}
-                        </p>
-                      )}
                       
                       {speaker.description && (
                         <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2">
@@ -672,8 +699,8 @@ const ProfilePage = () => {
       {showAvatarSelector && (
         <AvatarSelector
           currentAvatar={profile?.avatar}
-          onAvatarSelect={handleAvatarSelect}  
-          onClose={() => setShowAvatarSelector(false)} 
+          onAvatarSelect={handleAvatarSelect}
+          onClose={() => setShowAvatarSelector(false)}
         />
       )}
     </Layout>
