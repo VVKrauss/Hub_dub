@@ -20,6 +20,7 @@ import AdminAbout from './pages/admin/AdminAbout';
 import AdminNavigation from './pages/admin/AdminNavigation';
 import AdminExport from './pages/admin/AdminExport';
 import AdminEventStatistics from './pages/admin/AdminEventStatistics';
+import AdminAttendance from './pages/admin/AdminAttendance';
 import ProtectedRoute from './components/admin/ProtectedRoute';
 import PublicProtectedRoute from './components/auth/PublicProtectedRoute';
 import AdminCalendarPage from './pages/admin/AdminCalendarPage';
@@ -33,6 +34,7 @@ function App() {
     <div className="app">
       <Toaster position="top-center" />
       <Routes>
+        {/* Public routes */}
         <Route path="/" element={<HomePage />} />
         <Route path="/events" element={<EventsPage />} />
         <Route path="/events/:id" element={<EventDetailsPage />} />
@@ -72,8 +74,10 @@ function App() {
           <Route path="export" element={<AdminExport />} />
           <Route path="calendar" element={<AdminCalendarPage />} />
           <Route path="event-statistics" element={<AdminEventStatistics />} />
+          <Route path="attendance" element={<AdminAttendance />} />
         </Route>
 
+        {/* 404 route */}
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </div>
