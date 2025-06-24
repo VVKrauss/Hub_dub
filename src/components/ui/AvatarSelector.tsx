@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, X, Shuffle } from 'lucide-react';
+import { Check, X, Shuffle, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 type AvatarSelectorProps = {
@@ -15,6 +15,26 @@ const BASE_AVATAR_URL = 'https://jfvinriqydjtwsmayxix.supabase.co/storage/v1/obj
 const AvatarSelector = ({ currentAvatar, onAvatarSelect, onClose }: AvatarSelectorProps) => {
   const [selectedAvatar, setSelectedAvatar] = useState<string>(currentAvatar || '');
   const [loading, setLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 30;
+
+  const filteredAvatars = AVAILABLE_AVATARS.filter(avatar => {
+    if (!searchQuery) return true;
+    const avatarNumber = avatar.replace('.png', '');
+    return avatarNumber.includes(searchQuery);
+  });
+
+  const totalPages = Math.ceil(filteredAvatars.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentAvatars = filteredAvatars.slice(startIndex, endIndex);
+
+  // Reset page when search changes
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    setCurrentPage(1);
+  };
 
   const getRandomAvatar = () => {
     const randomIndex = Math.floor(Math.random() * AVAILABLE_AVATARS.length);
@@ -58,21 +78,44 @@ const AvatarSelector = ({ currentAvatar, onAvatarSelect, onClose }: AvatarSelect
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[60vh]">
-          {/* Random Avatar Button */}
-          <div className="mb-6 text-center">
-            <button
-              onClick={getRandomAvatar}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded-lg hover:bg-primary-200 dark:hover:bg-primary-900/50 transition-colors"
-            >
-              <Shuffle className="h-4 w-4" />
-              Случайный аватар
-            </button>
+        <div className="p-6 overflow-y-auto max-h-[70vh]">
+          {/* Search and Random Avatar */}
+          <div className="mb-6 space-y-4">
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Поиск по номеру аватара..."
+                value={searchQuery}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800"
+              />
+            </div>
+            
+            {/* Random Avatar Button */}
+            <div className="text-center">
+              <button
+                onClick={getRandomAvatar}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded-lg hover:bg-primary-200 dark:hover:bg-primary-900/50 transition-colors"
+              >
+                <Shuffle className="h-4 w-4" />
+                Случайный аватар
+              </button>
+            </div>
+          </div>
+
+          {/* Results count and pagination info */}
+          <div className="mb-4 flex justify-between items-center text-sm text-gray-600 dark:text-gray-400">
+            <span>Найдено: {filteredAvatars.length} из {AVAILABLE_AVATARS.length} аватаров</span>
+            {totalPages > 1 && (
+              <span>Страница {currentPage} из {totalPages}</span>
+            )}
           </div>
 
           {/* Avatar Grid */}
-          <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 gap-2">
-            {AVAILABLE_AVATARS.map((avatar) => {
+          <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 gap-2 mb-4">
+            {currentAvatars.map((avatar) => {
               const avatarUrl = BASE_AVATAR_URL + avatar;
               const isSelected = selectedAvatar === avatarUrl;
               const avatarNumber = avatar.replace('.png', '');
@@ -110,6 +153,39 @@ const AvatarSelector = ({ currentAvatar, onAvatarSelect, onClose }: AvatarSelect
               );
             })}
           </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && !searchQuery && (
+            <div className="flex justify-center items-center gap-2 mt-6">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="p-2 rounded-lg border border-gray-300 dark:border-dark-600 hover:bg-gray-100 dark:hover:bg-dark-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              
+              <span className="px-3 py-1 text-sm">
+                {currentPage} / {totalPages}
+              </span>
+              
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className="p-2 rounded-lg border border-gray-300 dark:border-dark-600 hover:bg-gray-100 dark:hover:bg-dark-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+
+          {/* No results message */}
+          {filteredAvatars.length === 0 && searchQuery && (
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              <p>Аватар с номером "{searchQuery}" не найден</p>
+              <p className="text-sm mt-1">Попробуйте другой номер от 1 до 90</p>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -141,7 +217,7 @@ const AvatarSelector = ({ currentAvatar, onAvatarSelect, onClose }: AvatarSelect
 };
 
 export default AvatarSelector;import { useState } from 'react';
-import { Check, X, Shuffle } from 'lucide-react';
+import { Check, X, Shuffle, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 type AvatarSelectorProps = {
@@ -157,6 +233,26 @@ const BASE_AVATAR_URL = 'https://jfvinriqydjtwsmayxix.supabase.co/storage/v1/obj
 const AvatarSelector = ({ currentAvatar, onAvatarSelect, onClose }: AvatarSelectorProps) => {
   const [selectedAvatar, setSelectedAvatar] = useState<string>(currentAvatar || '');
   const [loading, setLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 30;
+
+  const filteredAvatars = AVAILABLE_AVATARS.filter(avatar => {
+    if (!searchQuery) return true;
+    const avatarNumber = avatar.replace('.png', '');
+    return avatarNumber.includes(searchQuery);
+  });
+
+  const totalPages = Math.ceil(filteredAvatars.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentAvatars = filteredAvatars.slice(startIndex, endIndex);
+
+  // Reset page when search changes
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    setCurrentPage(1);
+  };
 
   const getRandomAvatar = () => {
     const randomIndex = Math.floor(Math.random() * AVAILABLE_AVATARS.length);
@@ -200,21 +296,44 @@ const AvatarSelector = ({ currentAvatar, onAvatarSelect, onClose }: AvatarSelect
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[60vh]">
-          {/* Random Avatar Button */}
-          <div className="mb-6 text-center">
-            <button
-              onClick={getRandomAvatar}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded-lg hover:bg-primary-200 dark:hover:bg-primary-900/50 transition-colors"
-            >
-              <Shuffle className="h-4 w-4" />
-              Случайный аватар
-            </button>
+        <div className="p-6 overflow-y-auto max-h-[70vh]">
+          {/* Search and Random Avatar */}
+          <div className="mb-6 space-y-4">
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Поиск по номеру аватара..."
+                value={searchQuery}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800"
+              />
+            </div>
+            
+            {/* Random Avatar Button */}
+            <div className="text-center">
+              <button
+                onClick={getRandomAvatar}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded-lg hover:bg-primary-200 dark:hover:bg-primary-900/50 transition-colors"
+              >
+                <Shuffle className="h-4 w-4" />
+                Случайный аватар
+              </button>
+            </div>
+          </div>
+
+          {/* Results count and pagination info */}
+          <div className="mb-4 flex justify-between items-center text-sm text-gray-600 dark:text-gray-400">
+            <span>Найдено: {filteredAvatars.length} из {AVAILABLE_AVATARS.length} аватаров</span>
+            {totalPages > 1 && (
+              <span>Страница {currentPage} из {totalPages}</span>
+            )}
           </div>
 
           {/* Avatar Grid */}
-          <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 gap-2">
-            {AVAILABLE_AVATARS.map((avatar) => {
+          <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 gap-2 mb-4">
+            {currentAvatars.map((avatar) => {
               const avatarUrl = BASE_AVATAR_URL + avatar;
               const isSelected = selectedAvatar === avatarUrl;
               const avatarNumber = avatar.replace('.png', '');
@@ -252,6 +371,39 @@ const AvatarSelector = ({ currentAvatar, onAvatarSelect, onClose }: AvatarSelect
               );
             })}
           </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && !searchQuery && (
+            <div className="flex justify-center items-center gap-2 mt-6">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="p-2 rounded-lg border border-gray-300 dark:border-dark-600 hover:bg-gray-100 dark:hover:bg-dark-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              
+              <span className="px-3 py-1 text-sm">
+                {currentPage} / {totalPages}
+              </span>
+              
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className="p-2 rounded-lg border border-gray-300 dark:border-dark-600 hover:bg-gray-100 dark:hover:bg-dark-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+
+          {/* No results message */}
+          {filteredAvatars.length === 0 && searchQuery && (
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              <p>Аватар с номером "{searchQuery}" не найден</p>
+              <p className="text-sm mt-1">Попробуйте другой номер от 1 до 90</p>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
