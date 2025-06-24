@@ -80,6 +80,34 @@ const AvatarSelector = ({ currentAvatar, onAvatarSelect, onClose }: AvatarSelect
 
         {/* Content */}
         <div className="p-6 overflow-y-auto max-h-[70vh]">
+          {/* Selected Avatar Preview */}
+          {selectedAvatar && (
+            <div className="mb-6 text-center">
+              <div className="inline-block relative">
+                <div className="w-24 h-24 rounded-xl overflow-hidden border-4 border-primary-500 shadow-lg mb-3 transition-all duration-300 hover:scale-105">
+                  <img
+                    src={selectedAvatar}
+                    alt="Выбранный аватар"
+                    className="w-full h-full object-cover transition-all duration-300"
+                  />
+                </div>
+                <button
+                  onClick={() => setSelectedAvatar('')}
+                  className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs transition-colors"
+                  title="Отменить выбор"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Выбранный аватар
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-500">
+                  Аватар #{selectedAvatar.split('/').pop()?.replace('.png', '') || ''}
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Search and Random Avatar */}
           <div className="mb-6 space-y-4">
             {/* Search */}
