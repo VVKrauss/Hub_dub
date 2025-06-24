@@ -673,7 +673,7 @@ const ProfilePage = () => {
         <AvatarSelector
           currentAvatar={profile?.avatar}
           onAvatarSelect={handleAvatarSelect}  
-          onClose={() => setShowAvatarSelector(false)}
+          onClose={() => setShowAvatarSelector(false)} 
         />
       )}
     </Layout>
