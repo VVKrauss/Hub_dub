@@ -19,8 +19,11 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
-  TrendingUp
+  TrendingUp,
+  Camera
 } from 'lucide-react';
+
+
 import { toast } from 'react-hot-toast';
 
 const supabase = createClient(
