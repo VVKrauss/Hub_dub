@@ -27,7 +27,6 @@ interface AttendanceRecord {
   notes?: string;
   profiles: {
     name: string;
-    email: string;
   };
   events?: {
     title: string;
@@ -60,7 +59,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
         .from('user_attendance')
         .select(`
           *,
-          profiles!user_attendance_user_id_fkey(name, email),
+          profiles!user_attendance_user_id_fkey(name),
           events(title)
         `)
         .order('scanned_at', { ascending: false })
