@@ -9,6 +9,8 @@ import { useFavoriteSpeakers, useFavoriteEvents } from '../hooks/useFavorites';
 import { getSupabaseImageUrl } from '../utils/imageUtils';
 import AvatarSelector from '../components/ui/AvatarSelector';
 import UserRegistrationHistory from '../components/profile/UserRegistrationHistory';
+import UserQRCode from '../components/profile/UserQRCode';
+import UserAttendanceHistory from '../components/profile/UserAttendanceHistory';
 
 type Profile = {
   id: string;
