@@ -366,7 +366,7 @@ ${exportedTables.map(table => `
 
   const groupedTables = {
     users: tables.filter(t => t.category === 'users'),
-    content: tables.filter(t => t.category === 'content'),
+    content: tables.filter(t => t.category === 'content'),  
     system: tables.filter(t => t.category === 'system')
   };
 
