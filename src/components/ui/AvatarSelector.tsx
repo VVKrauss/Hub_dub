@@ -1,3 +1,5 @@
+// src/components/ui/AvatarSelector.tsx
+
 import { useState } from 'react';
 import { Check, X, Shuffle, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'react-hot-toast';
@@ -9,7 +11,6 @@ type AvatarSelectorProps = {
 };
 
 const AVAILABLE_AVATARS = Array.from({ length: 90 }, (_, i) => `${i + 1}.png`);
-
 const BASE_AVATAR_URL = 'https://jfvinriqydjtwsmayxix.supabase.co/storage/v1/object/public/images/avatars/';
 
 const AvatarSelector = ({ currentAvatar, onAvatarSelect, onClose }: AvatarSelectorProps) => {
@@ -216,7 +217,9 @@ const AvatarSelector = ({ currentAvatar, onAvatarSelect, onClose }: AvatarSelect
   );
 };
 
-export default AvatarSelector;import { useState } from 'react';
+export default AvatarSelector;// src/components/ui/AvatarSelector.tsx
+
+import { useState } from 'react';
 import { Check, X, Shuffle, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -227,7 +230,6 @@ type AvatarSelectorProps = {
 };
 
 const AVAILABLE_AVATARS = Array.from({ length: 90 }, (_, i) => `${i + 1}.png`);
-
 const BASE_AVATAR_URL = 'https://jfvinriqydjtwsmayxix.supabase.co/storage/v1/object/public/images/avatars/';
 
 const AvatarSelector = ({ currentAvatar, onAvatarSelect, onClose }: AvatarSelectorProps) => {
