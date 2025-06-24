@@ -1,10 +1,10 @@
 // src/pages/admin/AdminAttendance.tsx
 import React, { useState, useEffect } from 'react';
-import { Camera, Users, Calendar, Download, Filter, Search, Eye, BarChart3, TrendingUp } from 'lucide-react';
+import { Camera, Users, Calendar, Download, Search, Eye, BarChart3, TrendingUp } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'react-hot-toast';
 import QRScanner from '../../components/admin/QRScanner';
-import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
+import { format, subDays, startOfMonth } from 'date-fns';
 
 interface AttendanceRecord {
   id: string;
@@ -15,11 +15,9 @@ interface AttendanceRecord {
   attendance_type: string;
   user_profile: {
     name: string;
-    email: string;
   };
   scanned_by_profile: {
     name: string;
-    email: string;
   };
   event?: {
     title: string;
@@ -130,8 +128,8 @@ const AdminAttendance = () => {
         .from('user_attendance')
         .select(`
           *,
-          user_profile:profiles!user_attendance_user_id_fkey(name, email),
-          scanned_by_profile:profiles!user_attendance_scanned_by_fkey(name, email),
+          user_profile:profiles!user_attendance_user_id_fkey(name),
+          scanned_by_profile:profiles!user_attendance_scanned_by_fkey(name),
           event:events(title, event_type)
         `)
         .order('scanned_at', { ascending: false });
@@ -162,13 +160,13 @@ const AdminAttendance = () => {
         query = query.gte('scanned_at', startDate.toISOString());
       }
 
-      // Поиск по имени пользователя или email
+      // Поиск по имени пользователя
       if (searchTerm) {
         // Для поиска нам нужно сначала найти пользователей, затем их посещения
         const { data: users, error: usersError } = await supabase
           .from('profiles')
           .select('id')
-          .or(`name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`);
+          .ilike('name', `%${searchTerm}%`);
 
         if (usersError) throw usersError;
 
@@ -214,8 +212,8 @@ const AdminAttendance = () => {
           attendance_type,
           location,
           notes,
-          user_profile:profiles!user_attendance_user_id_fkey(name, email),
-          scanned_by_profile:profiles!user_attendance_scanned_by_fkey(name, email),
+          user_profile:profiles!user_attendance_user_id_fkey(name),
+          scanned_by_profile:profiles!user_attendance_scanned_by_fkey(name),
           event:events(title, event_type)
         `)
         .order('scanned_at', { ascending: false });
@@ -226,13 +224,11 @@ const AdminAttendance = () => {
       const headers = [
         'Дата и время',
         'Пользователь',
-        'Email пользователя',
         'Тип посещения',
         'Мероприятие',
         'Местоположение',
         'Заметки',
-        'Отметил',
-        'Email админа'
+        'Отметил'
       ];
 
       const csvContent = [
@@ -240,13 +236,11 @@ const AdminAttendance = () => {
         ...data.map(record => [
           format(new Date(record.scanned_at), 'dd.MM.yyyy HH:mm'),
           `"${record.user_profile.name}"`,
-          record.user_profile.email,
           record.attendance_type === 'event' ? 'Мероприятие' : 'Общее',
           record.event ? `"${record.event.title}"` : '',
           record.location ? `"${record.location}"` : '',
           record.notes ? `"${record.notes}"` : '',
-          `"${record.scanned_by_profile.name}"`,
-          record.scanned_by_profile.email
+          `"${record.scanned_by_profile.name}"`
         ].join(','))
       ].join('\n');
 
@@ -372,7 +366,7 @@ const AdminAttendance = () => {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Поиск по имени или email..."
+                placeholder="Поиск по имени..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10 pr-4 py-2 border border-gray-300 dark:border-dark-600 rounded-lg dark:bg-dark-700 w-64"
@@ -466,13 +460,8 @@ const AdminAttendance = () => {
                 {attendanceRecords.map((record) => (
                   <tr key={record.id} className="hover:bg-gray-50 dark:hover:bg-dark-700">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900 dark:text-white">
-                          {record.user_profile.name}
-                        </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
-                          {record.user_profile.email}
-                        </div>
+                      <div className="text-sm font-medium text-gray-900 dark:text-white">
+                        {record.user_profile.name}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
@@ -502,9 +491,6 @@ const AdminAttendance = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900 dark:text-white">
                         {record.scanned_by_profile.name}
-                      </div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400">
-                        {record.scanned_by_profile.email}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900 dark:text-white max-w-xs">
