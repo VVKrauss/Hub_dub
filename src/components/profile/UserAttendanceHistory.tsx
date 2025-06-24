@@ -1,6 +1,6 @@
-src/components/profile/UserAttendanceHistory.tsx
+// src/components/profile/UserAttendanceHistory.tsx
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, User, Clock, FileText, Award, Filter, TrendingUp } from 'lucide-react';
+import { Calendar, MapPin, User, Clock, FileText, Award, TrendingUp } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'react-hot-toast';
 
@@ -84,7 +84,7 @@ const UserAttendanceHistory: React.FC<UserAttendanceHistoryProps> = ({ userId })
       const currentMonth = now.getMonth();
       const currentYear = now.getFullYear();
 
-      const stats: AttendanceStats = {
+      const calculatedStats: AttendanceStats = {
         total: data.length,
         thisMonth: data.filter(record => {
           const recordDate = new Date(record.scanned_at);
@@ -98,7 +98,7 @@ const UserAttendanceHistory: React.FC<UserAttendanceHistoryProps> = ({ userId })
         generalAttendance: data.filter(record => record.attendance_type === 'general').length
       };
 
-      setStats(stats);
+      setStats(calculatedStats);
     } catch (error) {
       console.error('Error fetching stats:', error);
     }
@@ -138,6 +138,7 @@ const UserAttendanceHistory: React.FC<UserAttendanceHistoryProps> = ({ userId })
       setPage(pageNum);
     } catch (error) {
       console.error('Error fetching attendance records:', error);
+      toast.error('Ошибка загрузки записей посещений');
     }
   };
 
