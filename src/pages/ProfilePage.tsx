@@ -704,13 +704,13 @@ const ProfilePage = () => {
       </div>
 
       {/* Avatar Selector Modal */}
-      {showAvatarSelector && (
-        <NewAvatarSelector
-          currentAvatar={profile?.avatar}
-          onAvatarSelect={handleAvatarSelect}
-          onClose={() => setShowAvatarSelector(false)}
-        />
-      )}
+     {showAvatarSelector && (
+  <AvatarSelector
+    currentAvatar={profile?.avatar}
+    onAvatarSelect={handleAvatarSelect}
+    onClose={() => setShowAvatarSelector(false)}
+  />
+)}
     </Layout>
   );
 };
