@@ -51,6 +51,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
   const [location, setLocation] = useState('');
   const [notes, setNotes] = useState('');
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [videoLoaded, setVideoLoaded] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
@@ -73,7 +74,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
           events(title)
         `)
         .order('scanned_at', { ascending: false })
-        .limit(5); // Меньше для мобильных
+        .limit(5);
 
       if (error) throw error;
       setRecentScans(data || []);
@@ -84,54 +85,128 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
 
   const startCamera = async () => {
     try {
+      console.log('🔍 Запуск камеры...');
       setCameraError(null);
       setLoading(true);
+      setVideoLoaded(false);
 
+      // Останавливаем предыдущий поток
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
       }
 
       if (!navigator.mediaDevices?.getUserMedia) {
         throw new Error('Камера не поддерживается');
       }
 
+      // Простые настройки камеры
       const constraints = {
         video: {
-          facingMode: 'environment',
-          width: { ideal: 640, max: 1280 },
-          height: { ideal: 480, max: 720 }
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 640 },
+          height: { ideal: 480 }
         },
         audio: false
       };
 
+      console.log('🎥 Получение потока...');
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      
+      console.log('✅ Поток получен:', stream);
+      console.log('📊 Треки:', stream.getVideoTracks().length);
+
       if (videoRef.current) {
-        videoRef.current.srcObject = stream;
+        const video = videoRef.current;
+        
+        // Очищаем предыдущий источник
+        video.srcObject = null;
+        
+        // Устанавливаем новый поток
+        video.srcObject = stream;
         streamRef.current = stream;
         
-        await new Promise((resolve, reject) => {
-          const video = videoRef.current!;
-          const onLoaded = () => {
-            video.removeEventListener('loadedmetadata', onLoaded);
-            video.removeEventListener('error', onError);
-            resolve(undefined);
-          };
-          const onError = () => {
-            video.removeEventListener('loadedmetadata', onLoaded);
-            video.removeEventListener('error', onError);
-            reject(new Error('Ошибка загрузки видео'));
-          };
-          video.addEventListener('loadedmetadata', onLoaded);
-          video.addEventListener('error', onError);
-        });
+        // Настройки видео для лучшей совместимости
+        video.muted = true;
+        video.playsInline = true;
+        video.autoplay = true;
+        
+        // Обработчики событий
+        const handleLoadedMetadata = () => {
+          console.log('📺 Метаданные загружены');
+          console.log('📐 Размеры видео:', video.videoWidth, 'x', video.videoHeight);
+          setVideoLoaded(true);
+        };
 
-        setIsScanning(true);
-        toast.success('Камера запущена');
+        const handleCanPlay = () => {
+          console.log('▶️ Видео готово к воспроизведению');
+          video.play().then(() => {
+            console.log('✅ Воспроизведение началось');
+            setIsScanning(true);
+            toast.success('Камера запущена');
+          }).catch(err => {
+            console.error('❌ Ошибка воспроизведения:', err);
+            setCameraError('Ошибка воспроизведения видео');
+          });
+        };
+
+        const handleError = (event: Event) => {
+          console.error('❌ Ошибка видео:', event);
+          setCameraError('Ошибка видео элемента');
+        };
+
+        // Добавляем обработчики
+        video.addEventListener('loadedmetadata', handleLoadedMetadata);
+        video.addEventListener('canplay', handleCanPlay);
+        video.addEventListener('error', handleError);
+
+        // Очистка при размонтировании
+        const cleanup = () => {
+          video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+          video.removeEventListener('canplay', handleCanPlay);
+          video.removeEventListener('error', handleError);
+        };
+
+        // Сохраняем функцию очистки
+        video.dataset.cleanup = 'true';
+
+        // Принудительно загружаем видео
+        video.load();
+
+        // Таймаут для отладки
+        setTimeout(() => {
+          if (!videoLoaded) {
+            console.warn('⚠️ Видео не загрузилось за 3 секунды');
+            console.log('📊 Состояние видео:', {
+              readyState: video.readyState,
+              networkState: video.networkState,
+              videoWidth: video.videoWidth,
+              videoHeight: video.videoHeight,
+              paused: video.paused,
+              srcObject: !!video.srcObject
+            });
+          }
+        }, 3000);
+
+      } else {
+        throw new Error('Видео элемент не найден');
       }
+
     } catch (error) {
-      console.error('Camera error:', error);
-      const message = error instanceof Error ? error.message : 'Ошибка камеры';
+      console.error('❌ Ошибка камеры:', error);
+      let message = 'Ошибка запуска камеры';
+      
+      if (error instanceof Error) {
+        if (error.name === 'NotAllowedError') {
+          message = 'Доступ запрещен. Разрешите камеру в настройках.';
+        } else if (error.name === 'NotFoundError') {
+          message = 'Камера не найдена.';
+        } else if (error.name === 'NotReadableError') {
+          message = 'Камера занята другим приложением.';
+        } else {
+          message = error.message;
+        }
+      }
+      
       setCameraError(message);
       toast.error(message);
     } finally {
@@ -140,14 +215,23 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
   };
 
   const stopCamera = () => {
+    console.log('🛑 Остановка камеры...');
+    
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current.getTracks().forEach(track => {
+        console.log('🔇 Остановка трека:', track.kind);
+        track.stop();
+      });
       streamRef.current = null;
     }
+    
     if (videoRef.current) {
       videoRef.current.srcObject = null;
+      videoRef.current.load(); // Принудительно сбрасываем
     }
+    
     setIsScanning(false);
+    setVideoLoaded(false);
     setCameraError(null);
   };
 
@@ -327,18 +411,32 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
                     <div className="relative w-full aspect-square max-w-64 mx-auto bg-black rounded-lg overflow-hidden">
                       <video
                         ref={videoRef}
-                        autoPlay
-                        playsInline
-                        muted
                         className="w-full h-full object-cover"
+                        style={{ 
+                          display: videoLoaded ? 'block' : 'none',
+                          transform: 'scaleX(-1)' // Зеркально для удобства
+                        }}
                       />
+                      
+                      {/* Показываем загрузку если видео не готово */}
+                      {!videoLoaded && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="text-white text-center">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
+                            <p className="text-sm">Загрузка видео...</p>
+                          </div>
+                        </div>
+                      )}
+                      
                       {/* Scanning overlay */}
-                      <div className="absolute inset-4 border-2 border-primary-500 rounded-lg">
-                        <div className="absolute top-0 left-0 w-4 h-4 border-l-2 border-t-2 border-white"></div>
-                        <div className="absolute top-0 right-0 w-4 h-4 border-r-2 border-t-2 border-white"></div>
-                        <div className="absolute bottom-0 left-0 w-4 h-4 border-l-2 border-b-2 border-white"></div>
-                        <div className="absolute bottom-0 right-0 w-4 h-4 border-r-2 border-b-2 border-white"></div>
-                      </div>
+                      {videoLoaded && (
+                        <div className="absolute inset-4 border-2 border-primary-500 rounded-lg">
+                          <div className="absolute top-0 left-0 w-4 h-4 border-l-2 border-t-2 border-white"></div>
+                          <div className="absolute top-0 right-0 w-4 h-4 border-r-2 border-t-2 border-white"></div>
+                          <div className="absolute bottom-0 left-0 w-4 h-4 border-l-2 border-b-2 border-white"></div>
+                          <div className="absolute bottom-0 right-0 w-4 h-4 border-r-2 border-b-2 border-white"></div>
+                        </div>
+                      )}
                     </div>
                     
                     <div className="space-y-2">
