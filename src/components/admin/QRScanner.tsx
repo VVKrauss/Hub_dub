@@ -69,7 +69,6 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
     };
   }, [isOpen]);
 
-  // Проверяем готовность видео элемента
   useEffect(() => {
     const checkVideoReady = () => {
       if (videoRef.current && isScanning) {
@@ -104,6 +103,12 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
     }
   };
 
+  // Функция для проверки является ли UUID валидным
+  const isValidUUID = (str: string): boolean => {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(str);
+  };
+
   const processQRCode = useCallback(async (qrData: string) => {
     // Предотвращаем множественные сканы
     const now = Date.now();
@@ -115,7 +120,25 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
       const parsed = JSON.parse(qrData);
       
       if (parsed.type === 'user_attendance' && parsed.userId && parsed.qrToken) {
-        // Исправленный запрос без email колонки
+        
+        // Проверяем если это тестовые данные
+        if (parsed.userId === 'test' || !isValidUUID(parsed.userId)) {
+          console.log('🧪 Обработка тестовых данных');
+          
+          // Создаем тестового пользователя без обращения к базе
+          setScannedUser({
+            userId: parsed.userId,
+            userName: parsed.userName || 'Тестовый Пользователь',
+            userEmail: parsed.userEmail || 'test@example.com',
+            qrToken: parsed.qrToken
+          });
+
+          stopScanner();
+          toast.success('🧪 Тестовый QR-код распознан');
+          return;
+        }
+
+        // Для реальных пользователей - проверяем в базе данных
         const { data: profile, error } = await supabase
           .from('profiles')
           .select('id, name, qr_token')
@@ -130,7 +153,7 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
         setScannedUser({
           userId: profile.id,
           userName: profile.name || `Пользователь ${profile.id.slice(0, 8)}`,
-          userEmail: parsed.userEmail || 'Не указан', // Берем из QR-кода
+          userEmail: parsed.userEmail || 'Не указан',
           qrToken: profile.qr_token
         });
 
@@ -139,6 +162,33 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
       }
       
       if (parsed.type === 'event_registration' && parsed.registrationId && parsed.eventId) {
+        
+        // Тестовые данные для регистрации
+        if (parsed.registrationId === 'test-reg' || parsed.eventId === 'test-event') {
+          console.log('🧪 Обработка тестовой регистрации');
+          
+          setScannedUser({
+            userId: parsed.userId || 'test-user',
+            userName: parsed.fullName || 'Тестовый Участник',
+            userEmail: parsed.email || 'test@example.com',
+            qrToken: parsed.registrationId,
+            registrationData: {
+              registrationId: parsed.registrationId,
+              eventId: parsed.eventId,
+              eventTitle: 'Тестовое Мероприятие',
+              adultTickets: parsed.adultTickets || 1,
+              childTickets: parsed.childTickets || 0,
+              totalAmount: parsed.totalAmount || 0,
+              paymentStatus: parsed.paymentStatus || 'free'
+            }
+          });
+
+          stopScanner();
+          toast.success('🧪 Тестовая регистрация распознана');
+          return;
+        }
+
+        // Реальная проверка регистрации
         const { data: registration, error } = await supabase
           .from('user_event_registrations')
           .select(`
@@ -153,10 +203,6 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
 
         if (error || !registration) {
           throw new Error('Регистрация не найдена');
-        }
-
-        if (registration.full_name !== parsed.fullName || registration.email !== parsed.email) {
-          throw new Error('Данные не соответствуют');
         }
 
         setScannedUser({
@@ -192,7 +238,6 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
       setScannerError(null);
       setLoading(true);
 
-      // Ждем инициализации компонента
       await new Promise(resolve => setTimeout(resolve, 500));
 
       if (!videoRef.current) {
@@ -201,7 +246,6 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
 
       console.log('✅ Видео элемент найден');
 
-      // Создаем новый экземпляр ридера
       const codeReader = new BrowserMultiFormatReader();
       codeReaderRef.current = codeReader;
 
@@ -214,10 +258,8 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
 
       console.log(`✅ Найдено камер: ${videoInputDevices.length}`);
       
-      // Выбираем первую доступную камеру
       const selectedDeviceId = videoInputDevices[0].deviceId;
 
-      // Запускаем декодирование
       console.log('🎯 Запуск декодирования...');
       await codeReader.decodeFromVideoDevice(
         selectedDeviceId,
@@ -229,7 +271,6 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
           }
           
           if (error && !(error instanceof NotFoundException)) {
-            // Игнорируем обычные ошибки "не найден"
             console.warn('⚠️ Ошибка декодирования:', error.message);
           }
         }
@@ -288,6 +329,19 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
     try {
       setLoading(true);
 
+      // Для тестовых пользователей просто показываем успех
+      if (scannedUser.userId === 'test' || scannedUser.userId === 'test-user' || !isValidUUID(scannedUser.userId)) {
+        console.log('🧪 Тестовое подтверждение посещения');
+        toast.success(`✅ Тестовое посещение отмечено: ${scannedUser.userName}`);
+        
+        // Сбрасываем состояние
+        setScannedUser(null);
+        setLocation('');
+        setNotes('');
+        return;
+      }
+
+      // Реальная запись в базу данных
       const attendanceData = {
         user_id: scannedUser.userId,
         scanned_by: user.id,
@@ -455,9 +509,15 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
                     rows={2}
                     onChange={handleManualInput}
                   />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Тест: {"{"}"type":"user_attendance","userId":"test","qrToken":"test123","userName":"Test User","userEmail":"test@test.com","timestamp":1703025600000{"}"}
-                  </p>
+                  <div className="mt-2 space-y-1">
+                    <p className="text-xs text-green-600 dark:text-green-400 font-medium">🧪 Тестовые данные:</p>
+                    <div className="bg-green-50 dark:bg-green-900/20 p-2 rounded text-xs font-mono">
+                      {"{"}"type":"user_attendance","userId":"test","qrToken":"test123","userName":"Тест Пользователь","userEmail":"test@test.com","timestamp":1703025600000{"}"}
+                    </div>
+                    <div className="bg-blue-50 dark:bg-blue-900/20 p-2 rounded text-xs font-mono">
+                      {"{"}"type":"event_registration","registrationId":"test-reg","eventId":"test-event","fullName":"Тест Участник","email":"test@test.com","adultTickets":2,"childTickets":1,"totalAmount":500,"paymentStatus":"paid"{"}"}
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -508,6 +568,13 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
                 <div className="bg-gray-50 dark:bg-dark-700 rounded-lg p-3">
                   <p className="font-medium">{scannedUser.userName}</p>
                   <p className="text-sm text-gray-500">{scannedUser.userEmail}</p>
+                  
+                  {/* Тестовый индикатор */}
+                  {(scannedUser.userId === 'test' || scannedUser.userId === 'test-user' || !isValidUUID(scannedUser.userId)) && (
+                    <div className="mt-2 p-2 bg-yellow-100 dark:bg-yellow-900/20 rounded text-xs">
+                      🧪 Тестовый режим - данные не будут сохранены в базу
+                    </div>
+                  )}
                   
                   {scannedUser.registrationData && (
                     <div className="mt-2 pt-2 border-t border-gray-200 dark:border-dark-600 text-sm">
@@ -585,4 +652,4 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
   );
 };
 
-export default QRScannerComponent; 
+export default QRScannerComponent;
