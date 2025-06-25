@@ -507,4 +507,4 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
   );
 };
 
-export default QRScanner;
+export default QRScanner; 
