@@ -237,6 +237,7 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
       console.log('🚀 Запуск ZXing сканера...');
       setScannerError(null);
       setLoading(true);
+      setIsScanning(true); // Move this earlier to ensure video element is rendered
 
       await new Promise(resolve => setTimeout(resolve, 500));
 
@@ -276,7 +277,6 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
         }
       );
 
-      setIsScanning(true);
       toast.success('🎯 Сканер запущен');
 
     } catch (error) {
@@ -299,6 +299,7 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
       
       setScannerError(message);
       toast.error(message);
+      setIsScanning(false); // Reset scanning state on error
     } finally {
       setLoading(false);
     }
