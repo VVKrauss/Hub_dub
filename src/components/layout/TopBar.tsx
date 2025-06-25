@@ -49,7 +49,7 @@ const TopBar = () => {
   const [navItems, setNavItems] = useState<NavItem[]>([]);
   const [topBarSettings, setTopBarSettings] = useState<TopBarSettings>({
     alignment: 'center',
-    style: 'modern',
+    style: 'classic',
     spacing: 'normal',
     showBorder: true,
     showShadow: true,
@@ -210,7 +210,7 @@ const TopBar = () => {
 
     // Граница и тень
     if (topBarSettings.showBorder) {
-      classes += ' border-b border-gray-200 dark:border-dark-700';
+      classes += ' border-b border-gray-200 dark:border-gray-700';
     }
     if (topBarSettings.showShadow) {
       classes += ' shadow-sm';
@@ -259,13 +259,13 @@ const TopBar = () => {
     // Отступы между элементами
     switch (topBarSettings.spacing) {
       case 'compact':
-        classes += ' space-x-4';
+        classes += ' gap-4';
         break;
       case 'normal':
-        classes += ' space-x-6';
+        classes += ' gap-6';
         break;
       case 'relaxed':
-        classes += ' space-x-8';
+        classes += ' gap-8';
         break;
     }
 
@@ -275,42 +275,36 @@ const TopBar = () => {
   const getLinkClasses = (isActive: boolean) => {
     let classes = 'font-medium relative transition-all duration-300 flex items-center gap-2';
 
-    // Отступы в зависимости от стиля
-    switch (topBarSettings.style) {
-      case 'classic':
-        classes += ' py-4 px-2';
-        break;
-      case 'modern':
-        classes += ' py-2 px-4 rounded-lg';
-        break;
-      case 'minimal':
-        classes += ' py-2 px-1';
-        break;
-      case 'rounded':
-        classes += ' py-2 px-4 rounded-full';
-        break;
-    }
+    // Базовые отступы
+    classes += ' py-4 px-2';
 
-    // Состояния активности
+    // Состояния активности для всех стилей
     if (isActive) {
       switch (topBarSettings.style) {
         case 'classic':
           classes += ' text-primary-600 dark:text-primary-400 after:content-[""] after:absolute after:bottom-0 after:left-0 after:w-full after:h-0.5 after:bg-primary-600 dark:after:bg-primary-400';
           break;
         case 'modern':
-          classes += ' text-white bg-primary-600 shadow-lg';
+          classes += ' text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20 rounded-lg';
           break;
         case 'minimal':
           classes += ' text-primary-600 dark:text-primary-400 font-semibold';
           break;
         case 'rounded':
-          classes += ' text-white bg-gradient-to-r from-primary-600 to-secondary-600 shadow-lg';
+          classes += ' text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20 rounded-full';
           break;
       }
     } else {
-      classes += ' hover:text-primary-600 dark:hover:text-primary-400';
-      if (topBarSettings.style === 'modern' || topBarSettings.style === 'rounded') {
-        classes += ' hover:bg-primary-50 dark:hover:bg-primary-900/20';
+      classes += ' text-gray-900 dark:text-white hover:text-primary-600 dark:hover:text-primary-400';
+      
+      // Hover эффекты для неактивных ссылок
+      switch (topBarSettings.style) {
+        case 'modern':
+          classes += ' hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg';
+          break;
+        case 'rounded':
+          classes += ' hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-full';
+          break;
       }
     }
 
@@ -357,7 +351,7 @@ const TopBar = () => {
                 >
                   <span>{item.label}</span>
                   {topBarSettings.showBadges && item.badge && (
-                    <span className="bg-red-500 text-white text-xs rounded-full px-2 py-1 min-w-[20px] h-5 flex items-center justify-center">
+                    <span className="bg-primary-500 text-white text-xs rounded-full px-2 py-1 min-w-[20px] h-5 flex items-center justify-center">
                       {item.badge}
                     </span>
                   )}
@@ -369,7 +363,7 @@ const TopBar = () => {
           <div className="flex md:flex-none items-center gap-4">
             <button 
               onClick={toggleTheme} 
-              className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-dark-800 transition-colors"
+              className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
               aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
             >
               {theme === 'dark' ? (
@@ -397,7 +391,7 @@ const TopBar = () => {
             {/* Mobile Menu Button */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 md:hidden rounded-md text-dark-900 dark:text-white hover:bg-gray-100 dark:hover:bg-dark-800 transition-colors"
+              className="p-2 md:hidden rounded-md text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
               aria-expanded={mobileMenuOpen}
               aria-label="Toggle menu"
             >
@@ -413,7 +407,7 @@ const TopBar = () => {
           {mobileMenuOpen && topBarSettings.mobileCollapse && (
             <div 
               ref={menuRef}
-              className="md:hidden absolute top-full left-0 right-0 bg-white dark:bg-dark-900 shadow-lg z-50 border-t border-gray-200 dark:border-dark-700"
+              className="md:hidden absolute top-full left-0 right-0 bg-white dark:bg-dark-900 shadow-lg z-50 border-t border-gray-200 dark:border-gray-700"
             >
               <nav className="container py-5 flex flex-col space-y-4">
                 {visibleNavItems.map(item => {
@@ -425,13 +419,13 @@ const TopBar = () => {
                       className={`py-2 font-medium flex items-center justify-between transition-colors ${
                         isActive 
                           ? 'text-primary-600 dark:text-primary-400' 
-                          : 'hover:text-primary-600 dark:hover:text-primary-400'
+                          : 'text-gray-900 dark:text-white hover:text-primary-600 dark:hover:text-primary-400'
                       }`}
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       <span>{item.label}</span>
                       {topBarSettings.showBadges && item.badge && (
-                        <span className="bg-red-500 text-white text-xs rounded-full px-2 py-1">
+                        <span className="bg-primary-500 text-white text-xs rounded-full px-2 py-1">
                           {item.badge}
                         </span>
                       )}
