@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 
 import { toast } from 'react-hot-toast';
+import QRScanner from './QRScanner';
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
@@ -36,6 +37,7 @@ const AdminLayout = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [showQRScanner, setShowQRScanner] = useState(false);
 
   // Проверяем размер экрана
   useEffect(() => {
@@ -53,13 +55,11 @@ const AdminLayout = () => {
   }, []);
 
   const navItems = [
-    // QR Scanner на первом месте
-    { to: '/admin/attendance', icon: QrCode, label: 'QR Сканер', shortLabel: 'QR', isHighlight: true },
-    
     // Основные разделы
     { to: '/admin', icon: LayoutDashboard, label: 'Главная страница', shortLabel: 'Главная' },
     { to: '/admin/events', icon: Calendar, label: 'Мероприятия', shortLabel: 'События' },
     { to: '/admin/speakers', icon: Users, label: 'Спикеры', shortLabel: 'Спикеры' },
+    { to: '/admin/attendance', icon: Users, label: 'Посещения', shortLabel: 'Посещения' },
     
     // Дополнительные разделы
     { to: '/admin/rent', icon: Building2, label: 'Аренда', shortLabel: 'Аренда' },
@@ -92,6 +92,13 @@ const AdminLayout = () => {
     setIsMobileMenuOpen(false);
   };
 
+  const openQRScanner = () => {
+    setShowQRScanner(true);
+    if (isMobile) {
+      closeMobileMenu();
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-dark-900">
       {/* Mobile menu overlay */}
@@ -111,12 +118,16 @@ const AdminLayout = () => {
           >
             <Menu className="h-5 w-5" />
           </button>
+          
           <h1 className="text-lg font-semibold">Админ панель</h1>
+          
+          {/* QR Scanner button in mobile header */}
           <button
-            onClick={handleLogout}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-700 text-red-600"
+            onClick={openQRScanner}
+            className="p-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white"
+            title="QR Сканер"
           >
-            <LogOut className="h-5 w-5" />
+            <QrCode className="h-5 w-5" />
           </button>
         </div>
       )}
@@ -147,16 +158,27 @@ const AdminLayout = () => {
           )}
           
           {!isMobile && (
-            <button
-              onClick={toggleSidebar}
-              className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-700 transition-colors"
-            >
-              {isSidebarCollapsed ? (
-                <ChevronRight className="h-4 w-4" />
-              ) : (
-                <ChevronLeft className="h-4 w-4" />
-              )}
-            </button>
+            <div className="flex items-center gap-2">
+              {/* QR Scanner button always visible */}
+              <button
+                onClick={openQRScanner}
+                className="p-1.5 rounded-lg bg-primary-500 hover:bg-primary-600 text-white transition-colors"
+                title="QR Сканер"
+              >
+                <QrCode className="h-4 w-4" />
+              </button>
+              
+              <button
+                onClick={toggleSidebar}
+                className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-700 transition-colors"
+              >
+                {isSidebarCollapsed ? (
+                  <ChevronRight className="h-4 w-4" />
+                ) : (
+                  <ChevronLeft className="h-4 w-4" />
+                )}
+              </button>
+            </div>
           )}
 
           {isMobile && (
@@ -168,6 +190,19 @@ const AdminLayout = () => {
             </button>
           )}
         </div>
+
+        {/* Quick QR Scanner Access in sidebar */}
+        {(!isSidebarCollapsed || isMobile) && (
+          <div className="p-2 border-b border-gray-200 dark:border-dark-700">
+            <button
+              onClick={openQRScanner}
+              className="w-full flex items-center gap-3 px-3 py-3 bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors font-medium"
+            >
+              <QrCode className="h-5 w-5" />
+              <span>QR Сканер</span>
+            </button>
+          </div>
+        )}
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto py-4">
@@ -185,25 +220,16 @@ const AdminLayout = () => {
                   className={({ isActive: navIsActive }) => `
                     group relative flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200
                     ${navIsActive || isActive
-                      ? item.isHighlight
-                        ? 'bg-primary-500 text-white shadow-lg' // Особый стиль для QR сканера
-                        : 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
+                      ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
                       : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-700'
                     }
                     ${isSidebarCollapsed && !isMobile ? 'justify-center' : ''}
-                    ${item.isHighlight ? 'border-2 border-primary-200 dark:border-primary-700' : ''}
                   `}
                   title={isSidebarCollapsed && !isMobile ? item.label : ''}
                 >
-                  <Icon className={`h-5 w-5 flex-shrink-0 ${
-                    item.isHighlight && (isActive || location.pathname === item.to) 
-                      ? 'text-white' 
-                      : ''
-                  }`} />
+                  <Icon className="h-5 w-5 flex-shrink-0" />
                   {(!isSidebarCollapsed || isMobile) && (
-                    <span className={`text-sm font-medium ${
-                      item.isHighlight ? 'font-semibold' : ''
-                    }`}>
+                    <span className="text-sm font-medium">
                       {item.label}
                     </span>
                   )}
@@ -213,13 +239,6 @@ const AdminLayout = () => {
                     <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
                       {item.label}
                     </div>
-                  )}
-
-                  {/* Highlight badge for QR scanner */}
-                  {item.isHighlight && (!isSidebarCollapsed || isMobile) && (
-                    <span className="ml-auto bg-white/20 text-white text-xs px-1.5 py-0.5 rounded-full font-medium">
-                      NEW
-                    </span>
                   )}
                 </NavLink>
               );
@@ -265,6 +284,14 @@ const AdminLayout = () => {
           <Outlet />
         </div>
       </main>
+
+      {/* QR Scanner Modal */}
+      {showQRScanner && (
+        <QRScanner
+          isOpen={showQRScanner}
+          onClose={() => setShowQRScanner(false)}
+        />
+      )}
     </div>
   );
 };
