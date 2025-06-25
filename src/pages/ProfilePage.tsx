@@ -705,12 +705,12 @@ const ProfilePage = () => {
 
       {/* Avatar Selector Modal */}
      {showAvatarSelector && (
-  <AvatarSelector
-    currentAvatar={profile?.avatar}
-    onAvatarSelect={handleAvatarSelect}
-    onClose={() => setShowAvatarSelector(false)}
-  />
-)}
+        <AvatarSelector
+          currentAvatar={profile?.avatar}
+          onAvatarSelect={handleAvatarSelect}
+          onClose={() => setShowAvatarSelector(false)}
+        />
+      )}
     </Layout>
   );
 };
