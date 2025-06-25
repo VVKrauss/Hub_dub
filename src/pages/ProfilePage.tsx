@@ -1,4 +1,5 @@
 // src/pages/ProfilePage.tsx
+// Упрощенная версия без сложной синхронизации контекста
 
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
@@ -41,7 +42,7 @@ type FavoriteEvent = {
 
 const ProfilePage = () => {
   const navigate = useNavigate();
-  const { user: currentUser, loading: authLoading, updateProfile, refreshProfile } = useAuth();
+  const { user: currentUser, loading: authLoading } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
@@ -103,9 +104,6 @@ const ProfilePage = () => {
 
             if (createError) throw createError;
             setProfile(created);
-            
-            // Обновляем контекст аутентификации
-            updateProfile(created);
           } catch (createError) {
             console.error('Error creating profile:', createError);
             // Fallback - создаем профиль без аватара
@@ -123,16 +121,9 @@ const ProfilePage = () => {
               .single();
 
             setProfile(created);
-            updateProfile(created);
           }
         } else {
           setProfile(profileData);
-          // Обновляем контекст, если профиль отличается
-          if (profileData && (!currentUser.profile || 
-              currentUser.profile.avatar !== profileData.avatar ||
-              currentUser.profile.name !== profileData.name)) {
-            updateProfile(profileData);
-          }
         }
 
         setFormData({
@@ -245,7 +236,7 @@ const ProfilePage = () => {
         setProfile(created);
       }
 
-      // Обновляем локальное состояние
+      // Обновляем только локальное состояние
       setProfile(prev => prev ? { ...prev, name: formData.name } : {
         id: currentUser.id,
         name: formData.name,
@@ -253,9 +244,6 @@ const ProfilePage = () => {
         avatar: '',
         created_at: new Date().toISOString()
       });
-
-      // ВАЖНО: Обновляем контекст аутентификации
-      updateProfile({ name: formData.name });
 
       setEditMode(false);
       toast.success('Профиль обновлен');
@@ -279,13 +267,17 @@ const ProfilePage = () => {
 
       if (error) throw error;
 
-      // Обновляем локальное состояние профиля
+      // Обновляем только локальное состояние профиля
       setProfile(prev => prev ? { ...prev, avatar: avatarUrl } : prev);
       
-      // ВАЖНО: Обновляем контекст аутентификации
-      updateProfile({ avatar: avatarUrl });
-      
       toast.success('Аватар обновлен');
+      
+      // Принудительно обновляем страницу через небольшую задержку
+      // чтобы TopBar подхватил новый аватар
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+      
     } catch (error) {
       console.error('Error updating avatar:', error);
       toast.error('Ошибка при обновлении аватара');
@@ -363,10 +355,9 @@ const ProfilePage = () => {
                   {/* Avatar */}
                   <div className="relative">
                     <div className="w-16 h-16 rounded-full overflow-hidden bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
-                      {/* Используем аватар из контекста, если доступен, иначе из локального профиля */}
-                      {(currentUser?.profile?.avatar || profile?.avatar) ? (
+                      {profile?.avatar ? (
                         <img
-                          src={currentUser?.profile?.avatar || profile?.avatar}
+                          src={profile.avatar}
                           alt="Avatar"
                           className="w-full h-full object-cover"
                           onError={(e) => {
@@ -724,7 +715,7 @@ const ProfilePage = () => {
       {/* Avatar Selector Modal */}
       {showAvatarSelector && (
         <AvatarSelector
-          currentAvatar={currentUser?.profile?.avatar || profile?.avatar}
+          currentAvatar={profile?.avatar}
           onAvatarSelect={handleAvatarSelect}
           onClose={() => setShowAvatarSelector(false)}
         />
