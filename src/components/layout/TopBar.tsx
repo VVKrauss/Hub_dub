@@ -1,5 +1,5 @@
 // src/components/layout/TopBar.tsx
-// Возвращаемся к оригинальной версии, но добавляем аватар
+// Исправленная версия с правильной загрузкой навигации из site_settings
 
 import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -22,16 +22,26 @@ type UserData = {
   email: string;
   name?: string;
   role?: string;
-  avatar?: string; // Добавляем поддержку аватара
+  avatar?: string;
 } | null;
+
+// Fallback навигация на случай если не удается загрузить из БД
+const FALLBACK_NAVIGATION = [
+  { id: 'home', label: 'Главная', path: '/', visible: true },
+  { id: 'events', label: 'Мероприятия', path: '/events', visible: true },
+  { id: 'speakers', label: 'Спикеры', path: '/speakers', visible: true },
+  { id: 'rent', label: 'Аренда', path: '/rent', visible: true },
+  { id: 'coworking', label: 'Коворкинг', path: '/coworking', visible: true },
+  { id: 'about', label: 'О нас', path: '/about', visible: true },
+];
 
 const TopBar = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [user, setUser] = useState<UserData>(null);
+  const [navItems, setNavItems] = useState<NavItem[]>(FALLBACK_NAVIGATION);
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
-  const [navItems, setNavItems] = useState<NavItem[]>([]);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -93,20 +103,25 @@ const TopBar = () => {
         email: authUser.user?.email || '',
         name: profile?.name || authUser.user?.user_metadata?.name,
         role: profile?.role,
-        avatar: profile?.avatar // Загружаем аватар из профиля
+        avatar: profile?.avatar
       });
     } catch (error) {
       console.error('Error fetching user profile:', error);
       // Fallback - устанавливаем только базовые данные
-      const { data: authUser } = await supabase.auth.getUser();
-      if (authUser.user) {
-        setUser({
-          id: userId,
-          email: authUser.user.email || '',
-          name: authUser.user.user_metadata?.name,
-          role: undefined,
-          avatar: undefined
-        });
+      try {
+        const { data: authUser } = await supabase.auth.getUser();
+        if (authUser.user) {
+          setUser({
+            id: userId,
+            email: authUser.user.email || '',
+            name: authUser.user.user_metadata?.name,
+            role: undefined,
+            avatar: undefined
+          });
+        }
+      } catch (fallbackError) {
+        console.error('Fallback error:', fallbackError);
+        setUser(null);
       }
     }
   };
@@ -114,25 +129,39 @@ const TopBar = () => {
   const fetchNavItems = async () => {
     try {
       const { data, error } = await supabase
-        .from('navigation_items')
-        .select('*')
-        .eq('visible', true)
-        .order('order_index');
+        .from('site_settings')
+        .select('navigation_items')
+        .limit(1)
+        .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching navigation items:', error);
+        // Используем fallback навигацию
+        return;
+      }
 
-      setNavItems(data || []);
+      if (data?.navigation_items && Array.isArray(data.navigation_items)) {
+        // Добавляем "Главная" в начало если её нет
+        const navItemsWithHome = data.navigation_items;
+        const hasHome = navItemsWithHome.some((item: NavItem) => item.path === '/');
+        
+        if (!hasHome) {
+          navItemsWithHome.unshift({
+            id: 'home',
+            label: 'Главная',
+            path: '/',
+            visible: true
+          });
+        }
+        
+        setNavItems(navItemsWithHome);
+      } else {
+        // Если navigation_items пустой или не существует, используем fallback
+        console.log('No navigation items found, using fallback');
+      }
     } catch (error) {
-      console.error('Error fetching nav items:', error);
-      // Fallback navigation items
-      setNavItems([
-        { id: '1', label: 'Главная', path: '/', visible: true },
-        { id: '2', label: 'Мероприятия', path: '/events', visible: true },
-        { id: '3', label: 'Спикеры', path: '/speakers', visible: true },
-        { id: '4', label: 'Аренда', path: '/rent', visible: true },
-        { id: '5', label: 'Коворкинг', path: '/coworking', visible: true },
-        { id: '6', label: 'О нас', path: '/about', visible: true },
-      ]);
+      console.error('Error fetching navigation items:', error);
+      // При ошибке оставляем fallback навигацию
     }
   };
 
