@@ -1,12 +1,12 @@
 // src/components/admin/QRScanner.tsx
+// Установите: npm install @zxing/library
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Camera, X, CheckCircle, AlertCircle, Users } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
-
-// Импортируем QR Scanner библиотеку
-import QrScanner from 'qr-scanner';
+import { BrowserMultiFormatReader, NotFoundException } from '@zxing/library';
 
 interface QRScannerProps {
   isOpen: boolean;
@@ -54,32 +54,21 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
   const [location, setLocation] = useState('');
   const [notes, setNotes] = useState('');
   const [scannerError, setScannerError] = useState<string | null>(null);
-  const [videoReady, setVideoReady] = useState(false);
+  const [lastScanTime, setLastScanTime] = useState<number>(0);
   
   const videoRef = useRef<HTMLVideoElement>(null);
-  const qrScannerRef = useRef<QrScanner | null>(null);
+  const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       fetchRecentScans();
     } else {
-      // Закрываем сканер при закрытии модала
       stopScanner();
     }
     return () => {
       stopScanner();
     };
   }, [isOpen]);
-
-  // Отдельный эффект для отслеживания готовности видео элемента
-  useEffect(() => {
-    if (videoRef.current) {
-      setVideoReady(true);
-      console.log('✅ Видео элемент готов');
-    } else {
-      setVideoReady(false);
-    }
-  }, [isScanning]); // Перепроверяем когда меняется состояние сканирования
 
   const fetchRecentScans = async () => {
     try {
@@ -101,6 +90,11 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
   };
 
   const processQRCode = useCallback(async (qrData: string) => {
+    // Предотвращаем множественные сканы
+    const now = Date.now();
+    if (now - lastScanTime < 2000) return;
+    setLastScanTime(now);
+
     try {
       console.log('🔍 Обработка QR кода:', qrData);
       const parsed = JSON.parse(qrData);
@@ -174,88 +168,79 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
       console.error('❌ Ошибка обработки QR:', error);
       toast.error(error instanceof Error ? error.message : 'Ошибка QR-кода');
     }
-  }, []);
+  }, [lastScanTime]);
 
   const startScanner = useCallback(async () => {
     try {
-      console.log('🚀 Попытка запуска QR сканера...');
+      console.log('🚀 Запуск ZXing сканера...');
       setScannerError(null);
       setLoading(true);
 
-      // Ждем небольшую задержку чтобы убедиться что DOM обновился
-      await new Promise(resolve => setTimeout(resolve, 100));
-
       if (!videoRef.current) {
-        throw new Error('Видео элемент не готов. Попробуйте еще раз.');
+        await new Promise(resolve => setTimeout(resolve, 100));
+        if (!videoRef.current) {
+          throw new Error('Видео элемент не готов');
+        }
       }
 
-      console.log('✅ Видео элемент найден:', videoRef.current);
+      // Создаем новый экземпляр ридера
+      const codeReader = new BrowserMultiFormatReader();
+      codeReaderRef.current = codeReader;
 
-      // Проверяем доступность QrScanner
-      if (!QrScanner) {
-        throw new Error('QR Scanner библиотека не загружена');
+      console.log('📷 Получение списка камер...');
+      const videoInputDevices = await codeReader.listVideoInputDevices();
+      
+      if (videoInputDevices.length === 0) {
+        throw new Error('Камеры не найдены');
       }
 
-      // Проверяем поддержку камеры
-      const hasCamera = await QrScanner.hasCamera();
-      if (!hasCamera) {
-        throw new Error('Камера не найдена');
+      console.log(`✅ Найдено камер: ${videoInputDevices.length}`);
+      
+      // Ищем заднюю камеру
+      let selectedDeviceId = videoInputDevices[0].deviceId;
+      
+      for (const device of videoInputDevices) {
+        console.log(`📹 Камера: ${device.label || 'Без названия'}`);
+        if (device.label.toLowerCase().includes('back') || 
+            device.label.toLowerCase().includes('rear') ||
+            device.label.toLowerCase().includes('environment')) {
+          selectedDeviceId = device.deviceId;
+          console.log('✅ Выбрана задняя камера');
+          break;
+        }
       }
-      console.log('📷 Камера доступна');
 
-      // Создаем экземпляр QR сканера с улучшенными настройками
-      const qrScanner = new QrScanner(
+      // Запускаем декодирование
+      console.log('🎯 Запуск декодирования...');
+      await codeReader.decodeFromVideoDevice(
+        selectedDeviceId,
         videoRef.current,
-        (result) => {
-          console.log('✅ QR код распознан:', result.data);
-          processQRCode(result.data);
-        },
-        {
-          returnDetailedScanResult: true,
-          highlightScanRegion: true,
-          highlightCodeOutline: true,
-          preferredCamera: 'environment',
-          maxScansPerSecond: 3,
-          calculateScanRegion: (video) => {
-            // Определяем область сканирования (центральная часть)
-            const smallerDimension = Math.min(video.videoWidth, video.videoHeight);
-            const scanRegionSize = Math.round(0.7 * smallerDimension);
-            const x = Math.round((video.videoWidth - scanRegionSize) / 2);
-            const y = Math.round((video.videoHeight - scanRegionSize) / 2);
-            return {
-              x: x,
-              y: y,
-              width: scanRegionSize,
-              height: scanRegionSize,
-              downScaledWidth: 400,
-              downScaledHeight: 400,
-            };
-          },
+        (result, error) => {
+          if (result) {
+            console.log('✅ QR код найден:', result.getText());
+            processQRCode(result.getText());
+          }
+          
+          if (error && !(error instanceof NotFoundException)) {
+            console.warn('⚠️ Ошибка декодирования:', error);
+          }
         }
       );
 
-      qrScannerRef.current = qrScanner;
-
-      // Запускаем сканер
-      await qrScanner.start();
-      
-      console.log('✅ QR сканер успешно запущен');
       setIsScanning(true);
       toast.success('🎯 Сканер запущен');
 
     } catch (error) {
-      console.error('❌ Ошибка запуска сканера:', error);
+      console.error('❌ Ошибка запуска:', error);
       let message = 'Ошибка запуска сканера';
       
       if (error instanceof Error) {
-        if (error.message.includes('Permission denied') || error.message.includes('NotAllowedError')) {
-          message = '🚫 Доступ к камере запрещен. Разрешите камеру в настройках браузера.';
-        } else if (error.message.includes('not found') || error.message.includes('NotFoundError')) {
-          message = '📷 Камера не найдена. Проверьте подключение камеры.';
-        } else if (error.message.includes('in use') || error.message.includes('NotReadableError')) {
-          message = '🔒 Камера занята другим приложением. Закройте другие приложения.';
-        } else if (error.message.includes('Видео элемент не готов')) {
-          message = '⏳ Интерфейс еще загружается. Попробуйте через секунду.';
+        if (error.message.includes('Permission denied') || error.name === 'NotAllowedError') {
+          message = '🚫 Доступ к камере запрещен';
+        } else if (error.message.includes('not found') || error.name === 'NotFoundError') {
+          message = '📷 Камера не найдена';
+        } else if (error.message.includes('in use') || error.name === 'NotReadableError') {
+          message = '🔒 Камера занята';
         } else {
           message = `❌ ${error.message}`;
         }
@@ -272,18 +257,18 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
     console.log('🛑 Остановка сканера...');
     
     try {
-      if (qrScannerRef.current) {
-        qrScannerRef.current.stop();
-        qrScannerRef.current.destroy();
-        qrScannerRef.current = null;
+      if (codeReaderRef.current) {
+        codeReaderRef.current.reset();
+        codeReaderRef.current = null;
         console.log('✅ Сканер остановлен');
       }
     } catch (error) {
-      console.warn('⚠️ Ошибка при остановке сканера:', error);
+      console.warn('⚠️ Ошибка остановки:', error);
     }
     
     setIsScanning(false);
     setScannerError(null);
+    setLastScanTime(0);
   }, []);
 
   const confirmAttendance = async () => {
@@ -333,9 +318,11 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
     }
   };
 
-  const handleManualInput = (qrText: string) => {
+  const handleManualInput = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const qrText = event.target.value;
     if (qrText.trim()) {
       processQRCode(qrText.trim());
+      event.target.value = '';
     }
   };
 
@@ -350,7 +337,7 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
             <div className="flex items-center gap-2">
               <Camera className="h-5 w-5" />
               <h2 className="text-lg font-semibold">QR Сканер</h2>
-              {videoReady && <span className="text-xs bg-green-500 px-1 rounded">готов</span>}
+              {isScanning && <span className="text-xs bg-green-500 px-2 py-1 rounded animate-pulse">🔴 LIVE</span>}
             </div>
             <button
               onClick={onClose}
@@ -380,7 +367,7 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
                         <div className="text-center">
                           <Camera className="h-12 w-12 text-gray-400 mx-auto mb-2" />
                           <p className="text-xs text-gray-500">
-                            {videoReady ? '✅ Готов к запуску' : '⏳ Инициализация...'}
+                            🚀 ZXing Ready
                           </p>
                         </div>
                       )}
@@ -388,24 +375,35 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
                     
                     <button
                       onClick={startScanner}
-                      disabled={loading || !videoReady}
+                      disabled={loading}
                       className="w-full btn-primary disabled:opacity-50 py-3 text-lg font-medium"
                     >
-                      {loading ? '🔄 Запуск...' : !videoReady ? '⏳ Подготовка...' : '📱 Запустить сканер'}
+                      {loading ? '🔄 Запуск...' : '📱 Запустить сканер'}
                     </button>
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {/* Видео элемент для QR сканера */}
+                    {/* Video элемент */}
                     <div className="relative w-full aspect-square max-w-64 mx-auto rounded-lg overflow-hidden bg-black">
                       <video
                         ref={videoRef}
                         className="w-full h-full object-cover"
                         style={{ transform: 'scaleX(-1)' }}
-                        muted
+                        autoPlay
                         playsInline
+                        muted
                       />
-                      {/* Overlay от библиотеки сам добавит подсветку QR кодов */}
+                      
+                      {/* Overlay сканирования */}
+                      <div className="absolute inset-4 border-2 border-primary-500 rounded-lg">
+                        <div className="absolute top-0 left-0 w-6 h-6 border-l-4 border-t-4 border-white rounded-tl"></div>
+                        <div className="absolute top-0 right-0 w-6 h-6 border-r-4 border-t-4 border-white rounded-tr"></div>
+                        <div className="absolute bottom-0 left-0 w-6 h-6 border-l-4 border-b-4 border-white rounded-bl"></div>
+                        <div className="absolute bottom-0 right-0 w-6 h-6 border-r-4 border-b-4 border-white rounded-br"></div>
+                        
+                        {/* Анимированная линия сканирования */}
+                        <div className="absolute top-1/2 left-4 right-4 h-0.5 bg-primary-400 opacity-80 animate-pulse"></div>
+                      </div>
                     </div>
                     
                     <div className="space-y-2">
@@ -413,7 +411,7 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
                         🎯 Наведите на QR-код
                       </p>
                       <p className="text-xs text-green-600 dark:text-green-400">
-                        ✨ Автоматическое распознавание
+                        ⚡ ZXing Engine
                       </p>
                       <button
                         onClick={stopScanner}
@@ -430,10 +428,13 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
                   <p className="text-sm font-medium mb-2">💻 Ручной ввод:</p>
                   <textarea
                     placeholder="Вставьте JSON данные QR-кода..."
-                    className="w-full p-2 border border-gray-300 dark:border-dark-600 rounded text-xs font-mono"
+                    className="w-full p-2 border border-gray-300 dark:border-dark-600 rounded text-xs font-mono resize-none"
                     rows={2}
-                    onChange={(e) => handleManualInput(e.target.value)}
+                    onChange={handleManualInput}
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Тест: {"{"}"type":"user_attendance","userId":"test","qrToken":"test123","userName":"Test","userEmail":"test@test.com","timestamp":1703025600000{"}"}
+                  </p>
                 </div>
               </div>
 
@@ -474,7 +475,7 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
               </div>
             </div>
           ) : (
-            /* Confirmation Screen */
+            /* Confirmation Screen - same as before */
             <div className="space-y-4">
               <div className="text-center">
                 <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-3" />
