@@ -19,13 +19,16 @@ type UserData = {
   email: string;
   name?: string;
   role?: string;
-  avatar?: string; // Добавляем поле avatar
+  avatar?: string;
 } | null;
+
+type TopbarHeight = 'compact' | 'standard' | 'large';
 
 const TopBar = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [user, setUser] = useState<UserData>(null);
+  const [topbarHeight, setTopbarHeight] = useState<TopbarHeight>('standard');
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const [navItems, setNavItems] = useState<NavItem[]>([]);
@@ -33,6 +36,7 @@ const TopBar = () => {
 
   useEffect(() => {
     fetchNavItems();
+    fetchTopbarSettings();
     checkUser();
 
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
@@ -86,7 +90,7 @@ const TopBar = () => {
         email: session?.user.email || '',
         name: profile?.name || session?.user.user_metadata?.name,
         role: profile?.role,
-        avatar: profile?.avatar // Добавляем аватар из профиля
+        avatar: profile?.avatar
       });
     } catch (error) {
       console.error('Error fetching user profile:', error);
@@ -97,7 +101,6 @@ const TopBar = () => {
           id: session.user.id,
           email: session.user.email || '',
           name: session.user.user_metadata?.name
-          // avatar остается undefined если профиль не загрузился
         });
       }
     }
@@ -120,6 +123,23 @@ const TopBar = () => {
     }
   };
 
+  const fetchTopbarSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('site_settings')
+        .select('topbar_settings')
+        .single();
+
+      if (error) throw error;
+
+      if (data?.topbar_settings?.height) {
+        setTopbarHeight(data.topbar_settings.height);
+      }
+    } catch (error) {
+      console.error('Error fetching topbar settings:', error);
+    }
+  };
+
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
@@ -130,8 +150,21 @@ const TopBar = () => {
 
   const visibleNavItems = navItems.filter(item => item.visible);
 
+  // Определяем класс высоты топбара
+  const topbarHeightClass = `topbar-${topbarHeight}`;
+
+  // Определяем высоту для мобильного меню в зависимости от размера топбара
+  const getMobileMenuTop = () => {
+    switch (topbarHeight) {
+      case 'compact': return 'top-12';
+      case 'standard': return 'top-14';
+      case 'large': return 'top-20';
+      default: return 'top-16';
+    }
+  };
+
   return (
-    <header className="topbar">
+    <header className={`topbar ${topbarHeightClass}`}>
       <div className="container flex items-center justify-between">
         <Link to="/" className="flex items-center" onClick={() => setMobileMenuOpen(false)}>
           <Logo className="h-10 w-auto" inverted={theme === 'dark'} />
@@ -201,7 +234,7 @@ const TopBar = () => {
         {mobileMenuOpen && (
           <div 
             ref={menuRef}
-            className="md:hidden absolute top-16 left-0 right-0 bg-white dark:bg-dark-900 shadow-lg z-50 animate-fade-in"
+            className={`mobile-menu md:hidden absolute ${getMobileMenuTop()} left-0 right-0 bg-white dark:bg-dark-900 shadow-lg z-50 animate-fade-in`}
           >
             <nav className="container py-5 flex flex-col space-y-4">
               {visibleNavItems.map(item => (
