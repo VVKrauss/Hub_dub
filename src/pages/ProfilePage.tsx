@@ -517,80 +517,114 @@ const ProfilePage = () => {
             </div>
           </div>
 
-          {/* Избранные спикеры */}
-          <div className="bg-white dark:bg-dark-800 rounded-lg shadow-md overflow-hidden">
-            <div className="p-6 border-b border-gray-200 dark:border-dark-700">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Heart className="h-5 w-5 text-primary-600 dark:text-primary-400" />
-                  <h3 className="text-lg font-medium">Избранные спикеры</h3>
-                  <span className="bg-gray-100 dark:bg-dark-700 text-gray-600 dark:text-gray-300 px-2 py-1 rounded-full text-xs">
-                    {favoriteSpeakersData.length}
-                  </span>
+         {/* Избранные спикеры */}
+<div className="bg-white dark:bg-dark-800 rounded-lg shadow-md overflow-hidden">
+  <div className="p-6 border-b border-gray-200 dark:border-dark-700">
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-2">
+        <Heart className="h-5 w-5 text-primary-600 dark:text-primary-400" />
+        <h3 className="text-lg font-medium">Избранные спикеры</h3>
+        <span className="bg-gray-100 dark:bg-dark-700 text-gray-600 dark:text-gray-300 px-2 py-1 rounded-full text-xs">
+          {favoriteSpeakersData.length}
+        </span>
+      </div>
+      <Link 
+        to="/speakers"
+        className="text-primary-600 hover:text-primary-700 text-sm flex items-center gap-1"
+      >
+        Все спикеры
+        <ExternalLink className="h-4 w-4" />
+      </Link>
+    </div>
+  </div>
+  
+  <div className="p-6">
+    {loadingFavorites ? (
+      <div className="flex justify-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+      </div>
+    ) : favoriteSpeakersData.length > 0 ? (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {favoriteSpeakersData.map((speaker) => (
+          <div 
+            key={speaker.id}
+            className="group border border-gray-200 dark:border-dark-700 rounded-lg p-4 hover:shadow-lg hover:border-primary-300 dark:hover:border-primary-600 transition-all duration-200"
+          >
+            <div className="flex items-start gap-3 mb-3">
+              {/* Фото спикера */}
+              <div className="flex-shrink-0">
+                <div className="w-14 h-14 rounded-full overflow-hidden bg-gradient-to-br from-primary-100 to-primary-200 dark:from-primary-900/30 dark:to-primary-800/30 ring-2 ring-gray-200 dark:ring-gray-700 group-hover:ring-primary-300 dark:group-hover:ring-primary-600 transition-all duration-200">
+                  {speaker.photos?.[0]?.url ? (
+                    <>
+                      <img
+                        src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/images/${speaker.photos[0].url}`}
+                        alt={speaker.name}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
+                          const placeholder = target.parentElement?.querySelector('.photo-placeholder') as HTMLElement;
+                          if (placeholder) {
+                            placeholder.classList.remove('hidden');
+                          }
+                        }}
+                      />
+                      <div className="photo-placeholder w-full h-full flex items-center justify-center hidden">
+                        <User className="w-7 h-7 text-primary-500 dark:text-primary-400" />
+                      </div>
+                    </>
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <User className="w-7 h-7 text-primary-500 dark:text-primary-400" />
+                    </div>
+                  )}
                 </div>
-                <Link 
-                  to="/speakers"
-                  className="text-primary-600 hover:text-primary-700 text-sm flex items-center gap-1"
-                >
-                  Все спикеры
-                  <ExternalLink className="h-4 w-4" />
-                </Link>
               </div>
+              
+              {/* Информация о спикере */}
+              <div className="flex-1 min-w-0">
+                <h4 className="font-semibold text-gray-900 dark:text-white line-clamp-2 group-hover:text-primary-700 dark:group-hover:text-primary-300 transition-colors">
+                  {speaker.name}
+                </h4>
+                {speaker.field_of_expertise && (
+                  <p className="text-sm text-primary-600 dark:text-primary-400 mt-1 line-clamp-2 font-medium">
+                    {speaker.field_of_expertise}
+                  </p>
+                )}
+              </div>
+              
+              {/* Кнопка удаления */}
+              <button
+                onClick={() => removeFavoriteSpeaker(speaker.id)}
+                className="text-gray-400 hover:text-red-500 p-1.5 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition-all duration-200 opacity-0 group-hover:opacity-100"
+                title="Удалить из избранного"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
             
-            <div className="p-6">
-              {loadingFavorites ? (
-                <div className="flex justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-                </div>
-              ) : favoriteSpeakersData.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {favoriteSpeakersData.map((speaker) => (
-                    <div 
-                      key={speaker.id}
-                      className="border border-gray-200 dark:border-dark-700 rounded-lg p-4 hover:shadow-md transition-shadow"
-                    >
-                      <div className="flex justify-between items-start mb-3">
-                        <div className="flex-1">
-                          <h4 className="font-medium text-gray-900 dark:text-white">
-                            {speaker.name}
-                          </h4>
-                          {speaker.field_of_expertise && (
-                            <p className="text-sm text-primary-600 dark:text-primary-400 mt-1">
-                              {speaker.field_of_expertise}
-                            </p>
-                          )}
-                        </div>
-                        <button
-                          onClick={() => removeFavoriteSpeaker(speaker.id)}
-                          className="text-red-500 hover:text-red-700 p-1"
-                          title="Удалить из избранного"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      </div>
-                      
-                      <div className="flex justify-between items-center">
-                        <Link 
-                          to={`/speakers/${speaker.id}`}
-                          className="text-primary-600 hover:text-primary-700 text-sm flex items-center gap-1"
-                        >
-                          Посмотреть профиль
-                          <ExternalLink className="h-3 w-3" />
-                        </Link>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                  <Heart className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>У вас пока нет любимых спикеров</p>
-                  <p className="text-sm mt-1">Добавьте спикеров в избранное на странице спикеров</p>
-                </div>
-              )}
+            {/* Ссылка на профиль */}
+            <div className="flex justify-between items-center pt-2 border-t border-gray-100 dark:border-gray-700">
+              <Link 
+                to={`/speakers/${speaker.id}`}
+                className="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 text-sm flex items-center gap-1 transition-colors font-medium"
+              >
+                Посмотреть профиль
+                <ExternalLink className="h-3 w-3" />
+              </Link>
             </div>
           </div>
+        ))}
+      </div>
+    ) : (
+      <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+        <Heart className="h-12 w-12 mx-auto mb-4 opacity-50" />
+        <p>У вас пока нет любимых спикеров</p>
+        <p className="text-sm mt-1">Добавьте спикеров в избранное на странице спикеров</p>
+      </div>
+    )}
+  </div>
+</div>
 
           {/* Избранные мероприятия */}
           <div className="bg-white dark:bg-dark-800 rounded-lg shadow-md overflow-hidden">
