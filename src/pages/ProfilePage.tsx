@@ -9,7 +9,7 @@ import Layout from '../components/layout/Layout';
 import { useAuth } from '../contexts/AuthContext';
 import { useFavoriteSpeakers, useFavoriteEvents } from '../hooks/useFavorites';
 import { getSupabaseImageUrl } from '../utils/imageUtils';
-import NewAvatarSelector from '../components/ui/NewAvatarSelector';
+import AvatarSelector from "../components/ui/AvatarSelector";
 import UserRegistrationHistory from '../components/profile/UserRegistrationHistory';
 import { getRandomAvatarUrl } from '../utils/dynamicAvatarUtils';
 
