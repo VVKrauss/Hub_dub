@@ -1,12 +1,11 @@
 // src/components/layout/TopBar.tsx
-// Обновленная версия с использованием AuthContext
+// Возвращаемся к оригинальной версии, но добавляем аватар
 
 import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, Sun, Moon, LogIn } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useTheme } from '../../contexts/ThemeContext';
-import { useAuth } from '../../contexts/AuthContext';
 import Logo from '../ui/Logo';
 import LoginModal from '../auth/LoginModal';
 import UserProfileDropdown from '../ui/UserProfileDropdown';
@@ -18,10 +17,18 @@ type NavItem = {
   visible: boolean;
 };
 
+type UserData = {
+  id: string;
+  email: string;
+  name?: string;
+  role?: string;
+  avatar?: string; // Добавляем поддержку аватара
+} | null;
+
 const TopBar = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
-  const { user, signOut } = useAuth(); // Используем AuthContext
+  const [user, setUser] = useState<UserData>(null);
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const [navItems, setNavItems] = useState<NavItem[]>([]);
@@ -29,6 +36,15 @@ const TopBar = () => {
 
   useEffect(() => {
     fetchNavItems();
+    checkUser();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        fetchUserProfile(session.user.id);
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
+      }
+    });
 
     // Close mobile menu when clicking outside
     const handleClickOutside = (event: MouseEvent) => {
@@ -40,9 +56,60 @@ const TopBar = () => {
     document.addEventListener('mousedown', handleClickOutside);
 
     return () => {
+      authListener.subscription.unsubscribe();
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
+
+  const checkUser = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        await fetchUserProfile(session.user.id);
+      } else {
+        setUser(null);
+      }
+    } catch (error) {
+      console.error('Error checking user:', error);
+      setUser(null);
+    }
+  };
+
+  const fetchUserProfile = async (userId: string) => {
+    try {
+      const { data: authUser } = await supabase.auth.getUser();
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('name, role, avatar')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error fetching profile:', error);
+      }
+
+      setUser({
+        id: userId,
+        email: authUser.user?.email || '',
+        name: profile?.name || authUser.user?.user_metadata?.name,
+        role: profile?.role,
+        avatar: profile?.avatar // Загружаем аватар из профиля
+      });
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      // Fallback - устанавливаем только базовые данные
+      const { data: authUser } = await supabase.auth.getUser();
+      if (authUser.user) {
+        setUser({
+          id: userId,
+          email: authUser.user.email || '',
+          name: authUser.user.user_metadata?.name,
+          role: undefined,
+          avatar: undefined
+        });
+      }
+    }
+  };
 
   const fetchNavItems = async () => {
     try {
@@ -71,22 +138,15 @@ const TopBar = () => {
 
   const handleLogout = async () => {
     try {
-      await signOut();
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      setUser(null);
     } catch (error) {
       console.error('Logout error:', error);
     }
   };
 
   const visibleNavItems = navItems.filter(item => item.visible);
-
-  // Формируем данные пользователя для UserProfileDropdown
-  const userData = user ? {
-    id: user.id,
-    email: user.email,
-    name: user.name || user.profile?.name,
-    role: user.profile?.role,
-    avatar: user.profile?.avatar, // Используем аватар из профиля
-  } : null;
 
   return (
     <>
@@ -127,9 +187,9 @@ const TopBar = () => {
               )}
             </button>
 
-            {userData ? (
+            {user ? (
               <UserProfileDropdown 
-                user={userData} 
+                user={user} 
                 onLogout={handleLogout} 
               />
             ) : (
@@ -179,7 +239,7 @@ const TopBar = () => {
                   </Link>
                 ))}
                 
-                {userData && (
+                {user && (
                   <div className="pt-4 border-t border-gray-200 dark:border-dark-700">
                     <Link 
                       to="/profile" 
@@ -188,7 +248,7 @@ const TopBar = () => {
                     >
                       Мой профиль
                     </Link>
-                    {userData.role === 'Admin' && (
+                    {user.role === 'Admin' && (
                       <Link 
                         to="/admin" 
                         className="block py-2 font-medium hover:text-primary dark:hover:text-primary-400"
@@ -209,7 +269,7 @@ const TopBar = () => {
                   </div>
                 )}
                 
-                {!userData && (
+                {!user && (
                   <button
                     onClick={() => {
                       setLoginModalOpen(true);
