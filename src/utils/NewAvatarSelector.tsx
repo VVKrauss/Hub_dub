@@ -512,4 +512,4 @@ const NewAvatarSelector = ({ currentAvatar, onAvatarSelect, onClose }: AvatarSel
   );
 };
 
-export default NewAvatarSelector;
+export default NewAvatarSelector;   
