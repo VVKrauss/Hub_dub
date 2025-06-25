@@ -995,9 +995,9 @@ const AdminNavigation = () => {
                       {Object.entries(footerSettings.socialLinks).map(([platform, url]) => {
                         if (!url) return null;
                         const logos = {
-                          telegram: 'https://jfvinriqydjtwsmayxix.supabase.co/storage/v1/object/public/images/logos/telegram-logo-100x100.png',
-                          instagram: 'https://jfvinriqydjtwsmayxix.supabase.co/storage/v1/object/public/images/logos/instagram-logo-100x100.png',
-                          youtube: 'https://jfvinriqydjtwsmayxix.supabase.co/storage/v1/object/public/images/logos/youtube-logo-100x100.png'
+                          telegram: 'https://jfvinriqydjtwsmayxix.supabase.co/storage/v1/object/public/images/logos/tg-logo-100x100.png',
+                          instagram: 'https://jfvinriqydjtwsmayxix.supabase.co/storage/v1/object/public/images/logos/ist-logo-100x100.png',
+                          youtube: 'https://jfvinriqydjtwsmayxix.supabase.co/storage/v1/object/public/images/logos/yt_100x100.png'
                         };
                         return (
                           <img 
