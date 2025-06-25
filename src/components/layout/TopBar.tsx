@@ -352,4 +352,184 @@ const TopBar = () => {
   // Фильтруем и сортируем видимые элементы навигации
   const visibleNavItems = navItems.filter(item => item.visible);
 
+  return (
+    <>
+      <header className={getTopBarClasses()}>
+        <div className={getContainerClasses()}>
+          <Link 
+            to="/" 
+            className="flex items-center" 
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            <Logo className="h-10 w-auto" inverted={theme === 'dark'} />
+          </Link>
+          
+          {/* Desktop Navigation */}
+          <nav className={getNavClasses()}>
+            {visibleNavItems.map(item => {
+              const isActive = location.pathname === item.path;
+              return (
+                <Link 
+                  key={item.id}
+                  to={item.path} 
+                  className={getLinkClasses(isActive)}
+                >
+                  <span>{item.label}</span>
+                  {topBarSettings.showBadges && item.badge && (
+                    <span className="bg-primary-500 text-white text-xs rounded-full px-2 py-1 min-w-[20px] h-5 flex items-center justify-center">
+                      {item.badge}
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
+          </nav>
+          
+          <div className="flex md:flex-none items-center gap-4">
+            <button 
+              onClick={toggleTheme} 
+              className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {theme === 'dark' ? (
+                <Sun className="h-5 w-5" />
+              ) : (
+                <Moon className="h-5 w-5" />
+              )}
+            </button>
+
+            {user ? (
+              <UserProfileDropdown 
+                user={user} 
+                onLogout={handleLogout} 
+              />
+            ) : (
+              <button
+                onClick={() => setLoginModalOpen(true)}
+                className="flex items-center gap-2 p-2 text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-md transition-colors"
+              >
+                <LogIn className="h-5 w-5" />
+                <span className="hidden sm:inline">Войти</span>
+              </button>
+            )}
+
+            {/* Mobile Menu Button */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="p-2 md:hidden rounded-md text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              aria-expanded={mobileMenuOpen}
+              aria-label="Toggle menu"
+            >
+              {mobileMenuOpen ? (
+                <X className="h-6 w-6" />
+              ) : (
+                <Menu className="h-6 w-6" />
+              )}
+            </button>
+          </div>
+          
+          {/* Mobile Navigation */}
+          {mobileMenuOpen && topBarSettings.mobileCollapse && (
+            <div 
+              ref={menuRef}
+              className="md:hidden absolute top-full left-0 right-0 bg-white dark:bg-dark-900 shadow-lg z-50 border-t border-gray-200 dark:border-gray-700"
+            >
+              <nav className={`container flex flex-col space-y-4 ${
+                topBarSettings.height === 'compact' ? 'py-3' : 
+                topBarSettings.height === 'normal' ? 'py-5' : 'py-7'
+              }`}>
+                {visibleNavItems.map(item => {
+                  const isActive = location.pathname === item.path;
+                  return (
+                    <Link 
+                      key={item.id}
+                      to={item.path} 
+                      className={`font-medium flex items-center justify-between transition-colors ${
+                        topBarSettings.height === 'compact' ? 'py-1' : 
+                        topBarSettings.height === 'normal' ? 'py-2' : 'py-3'
+                      } ${
+                        isActive 
+                          ? 'text-primary-600 dark:text-primary-400' 
+                          : 'text-gray-900 dark:text-white hover:text-primary-600 dark:hover:text-primary-400'
+                      }`}
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <span>{item.label}</span>
+                      {topBarSettings.showBadges && item.badge && (
+                        <span className="bg-primary-500 text-white text-xs rounded-full px-2 py-1">
+                          {item.badge}
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })}
+                {!user && (
+                  <button
+                    onClick={() => {
+                      setLoginModalOpen(true);
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`font-medium text-left text-primary-600 dark:text-primary-400 ${
+                      topBarSettings.height === 'compact' ? 'py-1' : 
+                      topBarSettings.height === 'normal' ? 'py-2' : 'py-3'
+                    }`}
+                  >
+                    Войти / Зарегистрироваться
+                  </button>
+                )}
+                {user && (
+                  <>
+                    <Link
+                      to="/profile"
+                      className={`font-medium hover:text-primary-600 dark:hover:text-primary-400 transition-colors ${
+                        topBarSettings.height === 'compact' ? 'py-1' : 
+                        topBarSettings.height === 'normal' ? 'py-2' : 'py-3'
+                      }`}
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      Мой профиль
+                    </Link>
+                    {user.role === 'Admin' && (
+                      <Link
+                        to="/admin"
+                        className={`font-medium hover:text-primary-600 dark:hover:text-primary-400 transition-colors ${
+                          topBarSettings.height === 'compact' ? 'py-1' : 
+                          topBarSettings.height === 'normal' ? 'py-2' : 'py-3'
+                        }`}
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        Панель управления
+                      </Link>
+                    )}
+                    <button
+                      onClick={() => {
+                        handleLogout();
+                        setMobileMenuOpen(false);
+                      }}
+                      className={`font-medium text-left text-red-600 dark:text-red-400 ${
+                        topBarSettings.height === 'compact' ? 'py-1' : 
+                        topBarSettings.height === 'normal' ? 'py-2' : 'py-3'
+                      }`}
+                    >
+                      Выйти
+                    </button>
+                  </>
+                )}
+              </nav>
+            </div>
+          )}
+        </div>
+      </header>
+
+      {/* Login Modal */}
+      <LoginModal
+        isOpen={loginModalOpen}
+        onClose={() => setLoginModalOpen(false)}
+      />
+    </>
+  );
+};
+
+export default TopBar;
+
   
