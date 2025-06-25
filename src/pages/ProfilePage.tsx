@@ -1,3 +1,5 @@
+// src/pages/ProfilePage.tsx
+
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -7,10 +9,9 @@ import Layout from '../components/layout/Layout';
 import { useAuth } from '../contexts/AuthContext';
 import { useFavoriteSpeakers, useFavoriteEvents } from '../hooks/useFavorites';
 import { getSupabaseImageUrl } from '../utils/imageUtils';
-import AvatarSelector from '../components/ui/AvatarSelector';
+import NewAvatarSelector from '../components/ui/NewAvatarSelector';
 import UserRegistrationHistory from '../components/profile/UserRegistrationHistory';
-import UserQRCode from '../components/profile/UserQRCode';
-import UserAttendanceHistory from '../components/profile/UserAttendanceHistory';
+import { getRandomAvatarUrl } from '../utils/dynamicAvatarUtils';
 
 type Profile = {
   id: string;
@@ -85,51 +86,67 @@ const ProfilePage = () => {
         
         if (!profileData) {
           // Создаем новый профиль с случайным аватаром
-          const newProfile = {
-            id: currentUser.id,
-            name: currentUser.name || currentUser.email?.split('@')[0] || 'Пользователь',
-            role: 'Guest'
-          };
-          
-          const { data: created, error: createError } = await supabase
-            .from('profiles')
-            .insert(newProfile)
-            .select()
-            .single();
-          
-          if (createError) {
-            console.error('Profile creation error:', createError);
-          } else {
+          try {
+            const randomAvatarUrl = await getRandomAvatarUrl();
+            const newProfile = {
+              id: currentUser.id,
+              name: currentUser.name || currentUser.email?.split('@')[0] || 'Пользователь',
+              role: 'Guest',
+              avatar: randomAvatarUrl
+            };
+
+            const { data: created, error: createError } = await supabase
+              .from('profiles')
+              .insert(newProfile)
+              .select()
+              .single();
+
+            if (createError) throw createError;
+            setProfile(created);
+          } catch (createError) {
+            console.error('Error creating profile:', createError);
+            // Fallback - создаем профиль без аватара
+            const fallbackProfile = {
+              id: currentUser.id,
+              name: currentUser.name || currentUser.email?.split('@')[0] || 'Пользователь',
+              role: 'Guest',
+              avatar: null
+            };
+
+            const { data: created } = await supabase
+              .from('profiles')
+              .insert(fallbackProfile)
+              .select()
+              .single();
+
             setProfile(created);
           }
         } else {
           setProfile(profileData);
         }
-        
+
         setFormData({
           name: profileData?.name || currentUser.name || currentUser.email?.split('@')[0] || 'Пользователь',
         });
-        
       } catch (error) {
-        console.error('Error:', error);
+        console.error('Profile fetch error:', error);
         toast.error('Ошибка загрузки профиля');
       } finally {
         setLoading(false);
       }
     };
 
-    if (!authLoading && currentUser) {
-      fetchProfile();
-    }
-  }, [currentUser?.id, authLoading]); // Изменил зависимости
+    const fetchFavorites = async () => {
+      if (currentUser) {
+        setLoadingFavorites(true);
+        await Promise.all([fetchFavoriteSpeakers(), fetchFavoriteEvents()]);
+        setLoadingFavorites(false);
+      }
+    };
 
-  // Отдельный useEffect для загрузки избранного
-  useEffect(() => {
-    if (!authLoading && currentUser) {
-      fetchFavoriteSpeakers();
-      fetchFavoriteEvents();
-    }
-  }, [currentUser?.id, authLoading]); // Добавил отдельный useEffect
+    fetchProfile();
+    fetchFavorites();
+  }, [currentUser]);
 
   const fetchFavoriteSpeakers = async () => {
     if (!currentUser) return;
@@ -240,6 +257,7 @@ const ProfilePage = () => {
     if (!currentUser) return;
 
     try {
+      // Обновляем в базе данных
       const { error } = await supabase
         .from('profiles')
         .update({ avatar: avatarUrl })
@@ -247,6 +265,7 @@ const ProfilePage = () => {
 
       if (error) throw error;
 
+      // Обновляем локальное состояние
       setProfile(prev => prev ? { ...prev, avatar: avatarUrl } : prev);
       toast.success('Аватар обновлен');
     } catch (error) {
@@ -461,36 +480,15 @@ const ProfilePage = () => {
                         <div>
                           <p className="text-sm text-gray-500 dark:text-gray-400">Дата регистрации</p>
                           <p className="font-medium">
-                            {profile?.created_at ? new Date(profile.created_at).toLocaleDateString('ru-RU') : 'Недавно'}
+                            {profile?.created_at ? 
+                              new Date(profile.created_at).toLocaleDateString('ru-RU') :
+                              'Не указано'
+                            }
                           </p>
                         </div>
                       </div>
                     </div>
                   )}
-                </div>
-                
-                <div>
-                  <h3 className="text-lg font-medium mb-4">Безопасность</h3>
-                  
-                  <button
-                    onClick={async () => {
-                      try {
-                        const { error } = await supabase.auth.resetPasswordForEmail(currentUser.email || '', {
-                          redirectTo: `${window.location.origin}/reset-password`,
-                        });
-                        
-                        if (error) throw error;
-                        
-                        toast.success('Инструкции отправлены на почту');
-                      } catch (error) {
-                        console.error('Reset error:', error);
-                        toast.error('Ошибка отправки');
-                      }
-                    }}
-                    className="btn-outline"
-                  >
-                    Изменить пароль
-                  </button>
                 </div>
               </div>
             </div>
@@ -500,8 +498,8 @@ const ProfilePage = () => {
           <div className="bg-white dark:bg-dark-800 rounded-lg shadow-md overflow-hidden">
             <div className="p-6 border-b border-gray-200 dark:border-dark-700">
               <div className="flex items-center gap-2">
-                <History className="h-5 w-5 text-purple-500" />
-                <h2 className="text-xl font-semibold">История регистраций</h2>
+                <History className="h-5 w-5 text-primary-600 dark:text-primary-400" />
+                <h3 className="text-lg font-medium">История регистраций</h3>
               </div>
             </div>
             
@@ -510,13 +508,24 @@ const ProfilePage = () => {
             </div>
           </div>
 
-          {/* Секция избранных спикеров */}
+          {/* Избранные спикеры */}
           <div className="bg-white dark:bg-dark-800 rounded-lg shadow-md overflow-hidden">
             <div className="p-6 border-b border-gray-200 dark:border-dark-700">
-              <div className="flex items-center gap-2">
-                <Heart className="h-5 w-5 text-red-500" />
-                <h2 className="text-xl font-semibold">Любимые спикеры</h2>
-                <span className="text-sm text-gray-500">({favoriteSpeakersData.length})</span>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Heart className="h-5 w-5 text-primary-600 dark:text-primary-400" />
+                  <h3 className="text-lg font-medium">Избранные спикеры</h3>
+                  <span className="bg-gray-100 dark:bg-dark-700 text-gray-600 dark:text-gray-300 px-2 py-1 rounded-full text-xs">
+                    {favoriteSpeakersData.length}
+                  </span>
+                </div>
+                <Link 
+                  to="/speakers"
+                  className="text-primary-600 hover:text-primary-700 text-sm flex items-center gap-1"
+                >
+                  Все спикеры
+                  <ExternalLink className="h-4 w-4" />
+                </Link>
               </div>
             </div>
             
@@ -528,65 +537,45 @@ const ProfilePage = () => {
               ) : favoriteSpeakersData.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {favoriteSpeakersData.map((speaker) => (
-                    <div key={speaker.id} className="border border-gray-200 dark:border-dark-700 rounded-lg p-4 hover:shadow-md transition-shadow">
+                    <div 
+                      key={speaker.id}
+                      className="border border-gray-200 dark:border-dark-700 rounded-lg p-4 hover:shadow-md transition-shadow"
+                    >
                       <div className="flex justify-between items-start mb-3">
-                        <div className="flex items-start gap-3 flex-1">
-                          {/* Фото спикера */}
-                          <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-200 dark:bg-dark-700 flex-shrink-0">
-                            {speaker.photos?.[0]?.url ? (
-                              <img
-                                src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/images/${speaker.photos[0].url}`}
-                                alt={speaker.name}
-                                className="w-full h-full object-cover"
-                                onError={(e) => {
-                                  // Fallback to default icon if image fails to load
-                                  const target = e.target as HTMLImageElement;
-                                  target.style.display = 'none';
-                                }}
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <User className="h-6 w-6 text-gray-400" />
-                              </div>
-                            )}
-                          </div>
-                          
-                          <div className="flex-1 min-w-0">
-                            <Link
-                              to={`/speakers/${speaker.id}`}
-                              className="font-medium text-primary-600 dark:text-primary-400 hover:underline block"
-                            >
-                              {speaker.name}
-                            </Link>
-                            
-                            {speaker.field_of_expertise && (
-                              <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-                                {speaker.field_of_expertise}
-                              </p>
-                            )}
-                          </div>
+                        <div className="flex-1">
+                          <h4 className="font-medium text-gray-900 dark:text-white">
+                            {speaker.name}
+                          </h4>
+                          {speaker.field_of_expertise && (
+                            <p className="text-sm text-primary-600 dark:text-primary-400 mt-1">
+                              {speaker.field_of_expertise}
+                            </p>
+                          )}
                         </div>
-                        
                         <button
                           onClick={() => removeFavoriteSpeaker(speaker.id)}
-                          className="text-red-500 hover:text-red-700 p-1 flex-shrink-0"
+                          className="text-red-500 hover:text-red-700 p-1"
                           title="Удалить из избранного"
                         >
                           <X className="h-4 w-4" />
                         </button>
                       </div>
                       
-                      {speaker.description && (
-                        <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2">
-                          {speaker.description}
-                        </p>
-                      )}
+                      <div className="flex justify-between items-center">
+                        <Link 
+                          to={`/speakers/${speaker.id}`}
+                          className="text-primary-600 hover:text-primary-700 text-sm flex items-center gap-1"
+                        >
+                          Посмотреть профиль
+                          <ExternalLink className="h-3 w-3" />
+                        </Link>
+                      </div>
                     </div>
                   ))}
                 </div>
               ) : (
                 <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                  <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <Heart className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p>У вас пока нет любимых спикеров</p>
                   <p className="text-sm mt-1">Добавьте спикеров в избранное на странице спикеров</p>
                 </div>
@@ -594,29 +583,39 @@ const ProfilePage = () => {
             </div>
           </div>
 
-          {/* Секция избранных мероприятий */}
+          {/* Избранные мероприятия */}
           <div className="bg-white dark:bg-dark-800 rounded-lg shadow-md overflow-hidden">
             <div className="p-6 border-b border-gray-200 dark:border-dark-700">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-blue-500" />
-                <h2 className="text-xl font-semibold">Любимые мероприятия</h2>
-                <span className="text-sm text-gray-500">({favoriteEventsData.length})</span>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-primary-600 dark:text-primary-400" />
+                  <h3 className="text-lg font-medium">Избранные мероприятия</h3>
+                  <span className="bg-gray-100 dark:bg-dark-700 text-gray-600 dark:text-gray-300 px-2 py-1 rounded-full text-xs">
+                    {favoriteEventsData.length}
+                  </span>
+                </div>
+                <Link 
+                  to="/events"
+                  className="text-primary-600 hover:text-primary-700 text-sm flex items-center gap-1"
+                >
+                  Все мероприятия
+                  <ExternalLink className="h-4 w-4" />
+                </Link>
               </div>
             </div>
             
             <div className="p-6">
-              {loadingFavorites ? (
-                <div className="flex justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-                </div>
-              ) : favoriteEventsData.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {favoriteEventsData.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {favoriteEventsData.map((event) => (
-                    <div key={event.id} className="border border-gray-200 dark:border-dark-700 rounded-lg overflow-hidden hover:shadow-md transition-shadow">
+                    <div 
+                      key={event.id}
+                      className="border border-gray-200 dark:border-dark-700 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
+                    >
                       {event.bg_image && (
-                        <div className="h-32 bg-gray-200 dark:bg-dark-700">
-                          <img
-                            src={getSupabaseImageUrl(event.bg_image)}
+                        <div className="h-32 overflow-hidden">
+                          <img 
+                            src={getSupabaseImageUrl(event.bg_image)} 
                             alt={event.title}
                             className="w-full h-full object-cover"
                           />
@@ -625,43 +624,52 @@ const ProfilePage = () => {
                       
                       <div className="p-4">
                         <div className="flex justify-between items-start mb-2">
-                          <Link
-                            to={`/events/${event.id}`}
-                            className="font-medium text-primary-600 dark:text-primary-400 hover:underline line-clamp-2"
-                          >
+                          <h4 className="font-medium text-gray-900 dark:text-white line-clamp-2">
                             {event.title}
-                          </Link>
+                          </h4>
                           <button
                             onClick={() => removeFavoriteEvent(event.id)}
-                            className="text-red-500 hover:text-red-700 p-1 flex-shrink-0 ml-2"
+                            className="text-red-500 hover:text-red-700 p-1 ml-2"
                             title="Удалить из избранного"
                           >
                             <X className="h-4 w-4" />
                           </button>
                         </div>
                         
-                        <div className="space-y-1 text-sm text-gray-500 dark:text-gray-400">
+                        <div className="space-y-2 text-sm text-gray-600 dark:text-gray-300 mb-3">
                           {event.start_at && (
-                            <div className="flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              {new Date(event.start_at).toLocaleDateString('ru-RU')}
+                            <div className="flex items-center gap-2">
+                              <Clock className="h-4 w-4" />
+                              <span>
+                                {new Date(event.start_at).toLocaleDateString('ru-RU')}
+                              </span>
                             </div>
                           )}
                           
                           {event.location && (
-                            <div className="flex items-center gap-1">
-                              <MapPin className="h-3 w-3" />
-                              {event.location}
+                            <div className="flex items-center gap-2">
+                              <MapPin className="h-4 w-4" />
+                              <span className="line-clamp-1">{event.location}</span>
                             </div>
                           )}
+                        </div>
+                        
+                        <div className="flex justify-between items-center">
+                          <Link 
+                            to={`/events/${event.id}`}
+                            className="text-primary-600 hover:text-primary-700 text-sm flex items-center gap-1"
+                          >
+                            Подробнее
+                            <ExternalLink className="h-3 w-3" />
+                          </Link>
                           
                           {event.event_type && (
-                            <span className="inline-block bg-gray-100 dark:bg-dark-700 text-gray-700 dark:text-gray-300 px-2 py-1 rounded text-xs">
+                            <span className="bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 px-2 py-1 rounded text-xs">
                               {event.event_type}
                             </span>
                           )}
                         </div>
-
+                        
                         {event.description && (
                           <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-2 mt-2">
                             {event.description}
@@ -681,112 +689,6 @@ const ProfilePage = () => {
             </div>
           </div>
 
-
-           {/* QR Code Section */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* QR Code */}
-            <UserQRCode
-              userId={currentUser.id}
-              userName={profile?.name || currentUser.name || currentUser.email?.split('@')[0] || 'Пользователь'}
-              userEmail={currentUser.email}
-            />
-
-            {/* Quick Stats */}
-            <div className="bg-white dark:bg-dark-800 rounded-lg shadow-md overflow-hidden">
-              <div className="bg-gradient-to-r from-green-500 to-green-600 p-4 text-white">
-                <h3 className="text-lg font-semibold">Краткая статистика</h3>
-                <p className="text-green-100 text-sm mt-1">Ваша активность</p>
-              </div>
-              
-              <div className="p-6 space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center p-4 bg-gray-50 dark:bg-dark-700 rounded-lg">
-                    <Heart className="h-8 w-8 text-red-500 mx-auto mb-2" />
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {favoriteSpeakersData.length + favoriteEventsData.length}
-                    </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Избранное</p>
-                  </div>
-                  
-                  <div className="text-center p-4 bg-gray-50 dark:bg-dark-700 rounded-lg">
-                    <Calendar className="h-8 w-8 text-blue-500 mx-auto mb-2" />
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {profile?.created_at ? Math.floor((Date.now() - new Date(profile.created_at).getTime()) / (1000 * 60 * 60 * 24)) : 0}
-                    </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Дней с нами</p>
-                  </div>
-                </div>
-
-                <div className="text-center">
-                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 rounded-lg">
-                    <Shield className="h-4 w-4" />
-                    <span className="text-sm font-medium">{profile?.role || 'Гость'}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Attendance History */}
-          <UserAttendanceHistory userId={currentUser.id} />
-
-          {/* Дополнительные функции - обновленная секция */}
-          <div className="bg-white dark:bg-dark-800 rounded-lg shadow-md overflow-hidden">
-            <div className="p-6">
-              <h3 className="text-lg font-medium mb-4 flex items-center gap-2">
-                <User className="h-5 w-5" />
-                Управление аккаунтом
-              </h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 border border-gray-200 dark:border-dark-600 rounded-lg">
-                  <h4 className="font-medium mb-2">QR-код для посещений</h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                    Покажите ваш QR-код админу для отметки посещения
-                  </p>
-                  <button
-                    onClick={() => {
-                      const qrSection = document.querySelector('[data-qr-section]');
-                      qrSection?.scrollIntoView({ behavior: 'smooth' });
-                    }}
-                    className="btn-outline text-sm"
-                  >
-                    Показать QR-код
-                  </button>
-                </div>
-
-                <div className="p-4 border border-gray-200 dark:border-dark-600 rounded-lg">
-                  <h4 className="font-medium mb-2">История активности</h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                    Просмотрите историю ваших посещений и активности
-                  </p>
-                  <button
-                    onClick={() => {
-                      const historySection = document.querySelector('[data-history-section]');
-                      historySection?.scrollIntoView({ behavior: 'smooth' });
-                    }}
-                    className="btn-outline text-sm"
-                  >
-                    Посмотреть историю
-                  </button>
-                </div>
-              </div>
-
-              <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                <h4 className="font-medium text-blue-800 dark:text-blue-200 mb-2">
-                  Как использовать QR-код
-                </h4>
-                <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
-                  <li>• Покажите QR-код администратору на входе</li>
-                  <li>• Код будет отсканирован для отметки вашего посещения</li>
-                  <li>• Все посещения сохраняются в вашей истории</li>
-                  <li>• При необходимости можно обновить QR-код</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-          
-
           {/* Заглушка для будущих секций */}
           <div className="bg-white dark:bg-dark-800 rounded-lg shadow-md overflow-hidden">
             <div className="p-6">
@@ -803,7 +705,7 @@ const ProfilePage = () => {
 
       {/* Avatar Selector Modal */}
       {showAvatarSelector && (
-        <AvatarSelector
+        <NewAvatarSelector
           currentAvatar={profile?.avatar}
           onAvatarSelect={handleAvatarSelect}
           onClose={() => setShowAvatarSelector(false)}
