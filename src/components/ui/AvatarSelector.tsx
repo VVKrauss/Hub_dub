@@ -1,19 +1,16 @@
 // src/components/ui/AvatarSelector.tsx
-// Замените ВЕСЬ код в этом файле на следующий:
+// Упрощенная версия без лишнего функционала
 
-import { useState, useEffect, useMemo } from 'react';
-import { Check, X, Shuffle, Search, ChevronLeft, ChevronRight, Grid, List, Star, Download, RefreshCw, AlertCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Check, X, Shuffle, Search, ChevronLeft, ChevronRight, RefreshCw, AlertCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { getCachedAvatars, invalidateAvatarCache, getAvatarStats } from '../../utils/dynamicAvatarUtils';
+import { getCachedAvatars, invalidateAvatarCache } from '../../utils/dynamicAvatarUtils';
 
 type AvatarSelectorProps = {
   currentAvatar?: string;
   onAvatarSelect: (avatarUrl: string) => void;
   onClose: () => void;
 };
-
-type ViewMode = 'grid' | 'list';
-type SortMode = 'default' | 'random' | 'favorites';
 
 type AvatarFile = {
   name: string;
@@ -26,30 +23,17 @@ const AvatarSelector = ({ currentAvatar, onAvatarSelect, onClose }: AvatarSelect
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [viewMode, setViewMode] = useState<ViewMode>('grid');
-  const [sortMode, setSortMode] = useState<SortMode>('default');
-  const [favorites, setFavorites] = useState<Set<string>>(new Set());
   
   // Состояние для аватаров
   const [availableAvatars, setAvailableAvatars] = useState<AvatarFile[]>([]);
   const [loadingAvatars, setLoadingAvatars] = useState(true);
   const [avatarsError, setAvatarsError] = useState<string | null>(null);
-  const [avatarStats, setAvatarStats] = useState<any>(null);
   
-  const itemsPerPage = viewMode === 'grid' ? 30 : 20;
+  const itemsPerPage = 24; // Удобное количество для сетки 6x4
 
   // Загрузка аватаров при монтировании
   useEffect(() => {
     loadAvatars();
-    loadAvatarStats();
-  }, []);
-
-  // Load favorites from localStorage
-  useEffect(() => {
-    const savedFavorites = localStorage.getItem('avatar_favorites');
-    if (savedFavorites) {
-      setFavorites(new Set(JSON.parse(savedFavorites)));
-    }
   }, []);
 
   const loadAvatars = async () => {
@@ -71,103 +55,44 @@ const AvatarSelector = ({ currentAvatar, onAvatarSelect, onClose }: AvatarSelect
     }
   };
 
-  const loadAvatarStats = async () => {
-    try {
-      const stats = await getAvatarStats();
-      setAvatarStats(stats);
-    } catch (error) {
-      console.error('Failed to load avatar stats:', error);
-    }
-  };
-
   const refreshAvatars = async () => {
     invalidateAvatarCache();
     await loadAvatars();
-    await loadAvatarStats();
     toast.success('Список аватаров обновлен');
   };
 
-  // Save favorites to localStorage
-  const saveFavorites = (newFavorites: Set<string>) => {
-    setFavorites(newFavorites);
-    localStorage.setItem('avatar_favorites', JSON.stringify([...newFavorites]));
-  };
+  // Фильтрация только по поиску
+  const filteredAvatars = availableAvatars.filter(avatar => {
+    if (!searchQuery) return true;
+    
+    const fileName = avatar.name.toLowerCase();
+    const fileNameWithoutExt = fileName.replace(/\.(png|jpg|jpeg|gif|webp)$/i, '');
+    const query = searchQuery.toLowerCase();
+    
+    return fileName.includes(query) || 
+           fileNameWithoutExt.includes(query) ||
+           (/\d+/.test(query) && fileName.includes(query));
+  });
 
-  const toggleFavorite = (avatarUrl: string) => {
-    const newFavorites = new Set(favorites);
-    if (newFavorites.has(avatarUrl)) {
-      newFavorites.delete(avatarUrl);
-    } else {
-      newFavorites.add(avatarUrl);
-    }
-    saveFavorites(newFavorites);
-  };
-
-  // Filter and sort avatars
-  const processedAvatars = useMemo(() => {
-    let avatars = [...availableAvatars];
-
-    // Filter by search
-    if (searchQuery) {
-      avatars = avatars.filter(avatar => {
-        const fileName = avatar.name.toLowerCase();
-        const fileNameWithoutExt = fileName.replace(/\.(png|jpg|jpeg|gif|webp)$/i, '');
-        const query = searchQuery.toLowerCase();
-        
-        return fileName.includes(query) || 
-               fileNameWithoutExt.includes(query) ||
-               // Поиск по номеру в имени
-               (/\d+/.test(query) && fileName.includes(query));
-      });
-    }
-
-    // Filter by sort mode
-    if (sortMode === 'favorites') {
-      avatars = avatars.filter(avatar => 
-        favorites.has(avatar.url)
-      );
-    }
-
-    // Sort avatars
-    switch (sortMode) {
-      case 'random':
-        avatars.sort(() => Math.random() - 0.5);
-        break;
-      case 'favorites':
-        // Already filtered above
-        break;
-      default:
-        // Keep default order (alphabetical by name)
-        avatars.sort((a, b) => a.name.localeCompare(b.name));
-    }
-
-    return avatars;
-  }, [availableAvatars, searchQuery, sortMode, favorites]);
-
-  const totalPages = Math.ceil(processedAvatars.length / itemsPerPage);
+  const totalPages = Math.ceil(filteredAvatars.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const currentAvatars = processedAvatars.slice(startIndex, endIndex);
+  const currentAvatars = filteredAvatars.slice(startIndex, endIndex);
 
-  // Reset page when filters change
+  // Reset page when search changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, sortMode, viewMode]);
+  }, [searchQuery]);
 
-  const getRandomAvatar = async () => {
-    try {
-      if (availableAvatars.length === 0) {
-        toast.error('Аватары не загружены');
-        return;
-      }
-
-      const randomIndex = Math.floor(Math.random() * availableAvatars.length);
-      const randomAvatar = availableAvatars[randomIndex].url;
-      setSelectedAvatar(randomAvatar);
-    } catch (error) {
-      console.error('Failed to get random avatar:', error);
-      toast.error('Ошибка при выборе случайного аватара');
+  const getRandomAvatar = () => {
+    if (availableAvatars.length === 0) {
+      toast.error('Аватары не загружены');
+      return;
     }
+
+    const randomIndex = Math.floor(Math.random() * availableAvatars.length);
+    const randomAvatar = availableAvatars[randomIndex].url;
+    setSelectedAvatar(randomAvatar);
   };
 
   const handleSave = async () => {
@@ -187,46 +112,24 @@ const AvatarSelector = ({ currentAvatar, onAvatarSelect, onClose }: AvatarSelect
     }
   };
 
-  const downloadAvatar = async (avatarUrl: string) => {
-    try {
-      const response = await fetch(avatarUrl);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.style.display = 'none';
-      a.href = url;
-      a.download = `avatar-${avatarUrl.split('/').pop()}`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      toast.success('Аватар скачан');
-    } catch (error) {
-      toast.error('Ошибка при скачивании');
-    }
-  };
-
   const AvatarGridItem = ({ avatar }: { avatar: AvatarFile }) => {
-    const isFavorite = favorites.has(avatar.url);
     const isSelected = selectedAvatar === avatar.url;
-    const fileName = avatar.name.replace(/\.(png|jpg|jpeg|gif|webp)$/i, '');
 
     return (
-      <div className="relative group">
+      <div className="relative">
         <div
           className={`
-            relative cursor-pointer rounded-xl overflow-hidden transition-all duration-300
+            relative cursor-pointer rounded-xl overflow-hidden transition-all duration-300 aspect-square
             ${isSelected 
               ? 'ring-4 ring-primary-500 ring-offset-2 ring-offset-white dark:ring-offset-dark-800 scale-105' 
               : 'hover:scale-105 hover:shadow-lg'
             }
-            ${viewMode === 'grid' ? 'aspect-square' : 'w-16 h-16'}
           `}
           onClick={() => setSelectedAvatar(avatar.url)}
         >
           <img
             src={avatar.url}
-            alt={`Аватар ${fileName}`}
+            alt="Аватар"
             className="w-full h-full object-cover"
             loading="lazy"
             onError={(e) => {
@@ -238,45 +141,11 @@ const AvatarSelector = ({ currentAvatar, onAvatarSelect, onClose }: AvatarSelect
           {/* Overlay for selected */}
           {isSelected && (
             <div className="absolute inset-0 bg-primary-500/20 flex items-center justify-center">
-              <div className="bg-primary-500 text-white rounded-full p-1">
-                <Check className="h-4 w-4" />
+              <div className="bg-primary-500 text-white rounded-full p-2">
+                <Check className="h-5 w-5" />
               </div>
             </div>
           )}
-
-          {/* Action buttons overlay */}
-          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleFavorite(avatar.url);
-              }}
-              className={`p-1 rounded-full transition-colors ${
-                isFavorite 
-                  ? 'bg-yellow-500 text-white' 
-                  : 'bg-white/80 hover:bg-white text-gray-700'
-              }`}
-              title={isFavorite ? 'Удалить из избранного' : 'Добавить в избранное'}
-            >
-              <Star className="h-3 w-3" fill={isFavorite ? 'currentColor' : 'none'} />
-            </button>
-            
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                downloadAvatar(avatar.url);
-              }}
-              className="p-1 rounded-full bg-white/80 hover:bg-white text-gray-700 transition-colors"
-              title="Скачать аватар"
-            >
-              <Download className="h-3 w-3" />
-            </button>
-          </div>
-        </div>
-
-        {/* Avatar name badge */}
-        <div className="absolute bottom-1 left-1 bg-black/50 text-white text-xs px-1.5 py-0.5 rounded max-w-full truncate">
-          {fileName}
         </div>
       </div>
     );
@@ -296,7 +165,7 @@ const AvatarSelector = ({ currentAvatar, onAvatarSelect, onClose }: AvatarSelect
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-dark-800 rounded-xl shadow-xl max-w-5xl w-full max-h-[90vh] overflow-hidden">
+      <div className="bg-white dark:bg-dark-800 rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
         {/* Header */}
         <div className="p-6 border-b border-gray-200 dark:border-dark-700">
           <div className="flex items-center justify-between">
@@ -311,16 +180,7 @@ const AvatarSelector = ({ currentAvatar, onAvatarSelect, onClose }: AvatarSelect
                     {avatarsError}
                   </span>
                 ) : (
-                  <>
-                    {processedAvatars.length} из {availableAvatars.length} аватаров
-                    {avatarStats && (
-                      <span className="ml-2">
-                        ({Object.entries(avatarStats.byExtension).map(([ext, count]) => 
-                          `${count} ${ext}`
-                        ).join(', ')})
-                      </span>
-                    )}
-                  </>
+                  `${filteredAvatars.length} из ${availableAvatars.length} аватаров`
                 )}
               </p>
             </div>
@@ -343,12 +203,12 @@ const AvatarSelector = ({ currentAvatar, onAvatarSelect, onClose }: AvatarSelect
         </div>
 
         {/* Controls */}
-        <div className="p-6 border-b border-gray-200 dark:border-dark-700 space-y-4">
-          {/* Selected Avatar Preview */}
+        <div className="p-6 border-b border-gray-200 dark:border-dark-700">
+          {/* Selected Avatar Preview - Полноразмерный */}
           {selectedAvatar && (
-            <div className="text-center">
+            <div className="text-center mb-6">
               <div className="inline-block relative">
-                <div className="w-20 h-20 rounded-xl overflow-hidden border-4 border-primary-500 shadow-lg mb-2">
+                <div className="w-32 h-32 rounded-xl overflow-hidden border-4 border-primary-500 shadow-lg mb-3">
                   <img
                     src={selectedAvatar}
                     alt="Выбранный аватар"
@@ -356,16 +216,16 @@ const AvatarSelector = ({ currentAvatar, onAvatarSelect, onClose }: AvatarSelect
                   />
                 </div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {selectedAvatar.split('/').pop()?.replace(/\.(png|jpg|jpeg|gif|webp)$/i, '') || 'Выбранный аватар'}
+                  Выбранный аватар
                 </p>
               </div>
             </div>
           )}
 
-          {/* Search and Controls Row */}
-          <div className="flex flex-wrap gap-4 items-center">
+          {/* Search and Random */}
+          <div className="flex gap-4 items-center">
             {/* Search */}
-            <div className="relative flex-1 min-w-64">
+            <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
                 type="text"
@@ -374,35 +234,6 @@ const AvatarSelector = ({ currentAvatar, onAvatarSelect, onClose }: AvatarSelect
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800"
               />
-            </div>
-
-            {/* Sort Mode */}
-            <select
-              value={sortMode}
-              onChange={(e) => setSortMode(e.target.value as SortMode)}
-              className="px-3 py-2 border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800"
-            >
-              <option value="default">По алфавиту</option>
-              <option value="random">Случайно</option>
-              <option value="favorites">Избранные ({favorites.size})</option>
-            </select>
-
-            {/* View Mode */}
-            <div className="flex bg-gray-100 dark:bg-dark-700 rounded-lg p-1">
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`p-2 rounded ${viewMode === 'grid' ? 'bg-white dark:bg-dark-600 shadow' : ''}`}
-                title="Сетка"
-              >
-                <Grid className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={`p-2 rounded ${viewMode === 'list' ? 'bg-white dark:bg-dark-600 shadow' : ''}`}
-                title="Список"
-              >
-                <List className="h-4 w-4" />
-              </button>
             </div>
 
             {/* Random Avatar */}
@@ -422,14 +253,8 @@ const AvatarSelector = ({ currentAvatar, onAvatarSelect, onClose }: AvatarSelect
           <div className="p-6">
             {currentAvatars.length > 0 ? (
               <>
-                {/* Avatars Grid/List */}
-                <div className={`
-                  ${viewMode === 'grid' 
-                    ? 'grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-3' 
-                    : 'grid grid-cols-8 sm:grid-cols-12 md:grid-cols-16 lg:grid-cols-20 gap-2'
-                  }
-                  mb-6
-                `}>
+                {/* Avatars Grid */}
+                <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-3 mb-6">
                   {currentAvatars.map((avatar) => (
                     <AvatarGridItem key={avatar.url} avatar={avatar} />
                   ))}
@@ -465,8 +290,8 @@ const AvatarSelector = ({ currentAvatar, onAvatarSelect, onClose }: AvatarSelect
                 <Search className="h-16 w-16 mx-auto mb-4 opacity-50" />
                 <h3 className="text-lg font-medium mb-2">Аватары не найдены</h3>
                 <p className="text-sm">
-                  {searchQuery || sortMode === 'favorites' 
-                    ? 'Попробуйте изменить поисковый запрос или фильтры'
+                  {searchQuery 
+                    ? 'Попробуйте изменить поисковый запрос'
                     : 'Аватары не загружены или произошла ошибка'
                   }
                 </p>
@@ -484,29 +309,21 @@ const AvatarSelector = ({ currentAvatar, onAvatarSelect, onClose }: AvatarSelect
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t border-gray-200 dark:border-dark-700 flex justify-between items-center">
-          <div className="text-sm text-gray-500 dark:text-gray-400">
-            {favorites.size > 0 && (
-              <span>{favorites.size} в избранном</span>
-            )}
-          </div>
-          
-          <div className="flex gap-3">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
-            >
-              Отмена
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={loading || !selectedAvatar}
-              className="px-6 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {loading && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-              {loading ? 'Сохранение...' : 'Сохранить'}
-            </button>
-          </div>
+        <div className="p-6 border-t border-gray-200 dark:border-dark-700 flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+          >
+            Отмена
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={loading || !selectedAvatar}
+            className="px-6 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {loading && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+            {loading ? 'Сохранение...' : 'Сохранить'}
+          </button>
         </div>
       </div>
     </div>
