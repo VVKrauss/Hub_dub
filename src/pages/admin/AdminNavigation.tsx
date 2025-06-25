@@ -17,6 +17,7 @@ interface TopBarSettings {
   alignment: 'left' | 'center' | 'right' | 'space-between';
   style: 'classic' | 'modern' | 'minimal' | 'rounded';
   spacing: 'compact' | 'normal' | 'relaxed';
+  height: 'compact' | 'normal' | 'large';
   showBorder: boolean;
   showShadow: boolean;
   backgroundColor: 'white' | 'transparent' | 'blur';
@@ -69,6 +70,7 @@ const AdminNavigation = () => {
     alignment: 'center',
     style: 'classic',
     spacing: 'normal',
+    height: 'compact',
     showBorder: true,
     showShadow: true,
     backgroundColor: 'white',
@@ -218,6 +220,7 @@ const AdminNavigation = () => {
       alignment: 'center',
       style: 'classic',
       spacing: 'normal',
+      height: 'compact',
       showBorder: true,
       showShadow: true,
       backgroundColor: 'white',
@@ -618,6 +621,22 @@ const AdminNavigation = () => {
                       <option value="compact">Компактные</option>
                       <option value="normal">Обычные</option>
                       <option value="relaxed">Увеличенные</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block font-medium mb-2 text-gray-700 dark:text-gray-300">Высота топбара</label>
+                    <select
+                      value={topBarSettings.height}
+                      onChange={(e) => setTopBarSettings(prev => ({
+                        ...prev,
+                        height: e.target.value as any
+                      }))}
+                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-dark-800 text-gray-900 dark:text-white"
+                    >
+                      <option value="compact">Компактная</option>
+                      <option value="normal">Обычная</option>
+                      <option value="large">Увеличенная</option>
                     </select>
                   </div>
 
