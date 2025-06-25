@@ -12,6 +12,7 @@ interface TopBarSettings {
   alignment: 'left' | 'center' | 'right' | 'space-between';
   style: 'classic' | 'modern' | 'minimal' | 'rounded';
   spacing: 'compact' | 'normal' | 'relaxed';
+  height: 'compact' | 'normal' | 'large';
   showBorder: boolean;
   showShadow: boolean;
   backgroundColor: 'white' | 'transparent' | 'blur';
@@ -51,6 +52,7 @@ const TopBar = () => {
     alignment: 'center',
     style: 'classic',
     spacing: 'normal',
+    height: 'compact',
     showBorder: true,
     showShadow: true,
     backgroundColor: 'white',
@@ -220,7 +222,20 @@ const TopBar = () => {
   };
 
   const getContainerClasses = () => {
-    let classes = 'flex items-center justify-between py-4 px-4 sm:px-6 lg:px-8';
+    let classes = 'flex items-center justify-between px-4 sm:px-6 lg:px-8';
+    
+    // Высота топбара
+    switch (topBarSettings.height) {
+      case 'compact':
+        classes += ' py-2';
+        break;
+      case 'normal':
+        classes += ' py-4';
+        break;
+      case 'large':
+        classes += ' py-6';
+        break;
+    }
     
     switch (topBarSettings.maxWidth) {
       case 'container':
@@ -275,8 +290,18 @@ const TopBar = () => {
   const getLinkClasses = (isActive: boolean) => {
     let classes = 'font-medium relative transition-all duration-300 flex items-center gap-2';
 
-    // Базовые отступы
-    classes += ' py-4 px-2';
+    // Отступы в зависимости от высоты топбара
+    switch (topBarSettings.height) {
+      case 'compact':
+        classes += ' py-2 px-2';
+        break;
+      case 'normal':
+        classes += ' py-3 px-2';
+        break;
+      case 'large':
+        classes += ' py-4 px-2';
+        break;
+    }
 
     // Состояния активности для всех стилей
     if (isActive) {
@@ -327,164 +352,4 @@ const TopBar = () => {
   // Фильтруем и сортируем видимые элементы навигации
   const visibleNavItems = navItems.filter(item => item.visible);
 
-  return (
-    <>
-      <header className={getTopBarClasses()}>
-        <div className={getContainerClasses()}>
-          <Link 
-            to="/" 
-            className="flex items-center" 
-            onClick={() => setMobileMenuOpen(false)}
-          >
-            <Logo className="h-10 w-auto" inverted={theme === 'dark'} />
-          </Link>
-          
-          {/* Desktop Navigation */}
-          <nav className={getNavClasses()}>
-            {visibleNavItems.map(item => {
-              const isActive = location.pathname === item.path;
-              return (
-                <Link 
-                  key={item.id}
-                  to={item.path} 
-                  className={getLinkClasses(isActive)}
-                >
-                  <span>{item.label}</span>
-                  {topBarSettings.showBadges && item.badge && (
-                    <span className="bg-primary-500 text-white text-xs rounded-full px-2 py-1 min-w-[20px] h-5 flex items-center justify-center">
-                      {item.badge}
-                    </span>
-                  )}
-                </Link>
-              );
-            })}
-          </nav>
-          
-          <div className="flex md:flex-none items-center gap-4">
-            <button 
-              onClick={toggleTheme} 
-              className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-              aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-            >
-              {theme === 'dark' ? (
-                <Sun className="h-5 w-5" />
-              ) : (
-                <Moon className="h-5 w-5" />
-              )}
-            </button>
-
-            {user ? (
-              <UserProfileDropdown 
-                user={user} 
-                onLogout={handleLogout} 
-              />
-            ) : (
-              <button
-                onClick={() => setLoginModalOpen(true)}
-                className="flex items-center gap-2 p-2 text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-md transition-colors"
-              >
-                <LogIn className="h-5 w-5" />
-                <span className="hidden sm:inline">Войти</span>
-              </button>
-            )}
-
-            {/* Mobile Menu Button */}
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 md:hidden rounded-md text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-              aria-expanded={mobileMenuOpen}
-              aria-label="Toggle menu"
-            >
-              {mobileMenuOpen ? (
-                <X className="h-6 w-6" />
-              ) : (
-                <Menu className="h-6 w-6" />
-              )}
-            </button>
-          </div>
-          
-          {/* Mobile Navigation */}
-          {mobileMenuOpen && topBarSettings.mobileCollapse && (
-            <div 
-              ref={menuRef}
-              className="md:hidden absolute top-full left-0 right-0 bg-white dark:bg-dark-900 shadow-lg z-50 border-t border-gray-200 dark:border-gray-700"
-            >
-              <nav className="container py-5 flex flex-col space-y-4">
-                {visibleNavItems.map(item => {
-                  const isActive = location.pathname === item.path;
-                  return (
-                    <Link 
-                      key={item.id}
-                      to={item.path} 
-                      className={`py-2 font-medium flex items-center justify-between transition-colors ${
-                        isActive 
-                          ? 'text-primary-600 dark:text-primary-400' 
-                          : 'text-gray-900 dark:text-white hover:text-primary-600 dark:hover:text-primary-400'
-                      }`}
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      <span>{item.label}</span>
-                      {topBarSettings.showBadges && item.badge && (
-                        <span className="bg-primary-500 text-white text-xs rounded-full px-2 py-1">
-                          {item.badge}
-                        </span>
-                      )}
-                    </Link>
-                  );
-                })}
-                {!user && (
-                  <button
-                    onClick={() => {
-                      setLoginModalOpen(true);
-                      setMobileMenuOpen(false);
-                    }}
-                    className="py-2 font-medium text-left text-primary-600 dark:text-primary-400"
-                  >
-                    Войти / Зарегистрироваться
-                  </button>
-                )}
-                {user && (
-                  <>
-                    <Link
-                      to="/profile"
-                      className="py-2 font-medium hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      Мой профиль
-                    </Link>
-                    {user.role === 'Admin' && (
-                      <Link
-                        to="/admin"
-                        className="py-2 font-medium hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
-                        onClick={() => setMobileMenuOpen(false)}
-                      >
-                        Панель управления
-                      </Link>
-                    )}
-                    <button
-                      onClick={() => {
-                        handleLogout();
-                        setMobileMenuOpen(false);
-                      }}
-                      className="py-2 font-medium text-left text-red-600 dark:text-red-400"
-                    >
-                      Выйти
-                    </button>
-                  </>
-                )}
-              </nav>
-            </div>
-          )}
-        </div>
-      </header>
-
-      {/* Login Modal */}
-      <LoginModal
-        isOpen={loginModalOpen}
-        onClose={() => setLoginModalOpen(false)}
-      />
-    </>
-  );
-};
-
-export default TopBar;
+  
