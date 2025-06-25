@@ -1,6 +1,6 @@
 // src/components/admin/QRScanner.tsx
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Camera, X, CheckCircle, AlertCircle, Users, Calendar, MapPin, MessageSquare } from 'lucide-react';
+import { Camera, X, CheckCircle, AlertCircle, Users, Calendar, MapPin, MessageSquare, Upload } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
@@ -50,8 +50,10 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
   const [recentScans, setRecentScans] = useState<AttendanceRecord[]>([]);
   const [location, setLocation] = useState('');
   const [notes, setNotes] = useState('');
+  const [cameraError, setCameraError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const animationFrameRef = useRef<number>();
 
   useEffect(() => {
     if (isOpen) {
@@ -59,6 +61,9 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
     }
     return () => {
       stopCamera();
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
     };
   }, [isOpen]);
 
@@ -83,19 +88,70 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
 
   const startCamera = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment' } 
-      });
+      setCameraError(null);
+      setLoading(true);
+
+      // Останавливаем предыдущий поток если есть
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+
+      // Проверяем доступность камеры
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Камера не поддерживается в этом браузере');
+      }
+
+      // Запрашиваем доступ к камере
+      const constraints = {
+        video: {
+          facingMode: { ideal: 'environment' }, // Предпочитаем заднюю камеру
+          width: { ideal: 640 },
+          height: { ideal: 480 }
+        },
+        audio: false
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         streamRef.current = stream;
+        
+        // Ждем когда видео загрузится
+        await new Promise((resolve, reject) => {
+          if (!videoRef.current) {
+            reject(new Error('Video element not found'));
+            return;
+          }
+
+          const video = videoRef.current;
+          
+          const onLoadedMetadata = () => {
+            video.removeEventListener('loadedmetadata', onLoadedMetadata);
+            video.removeEventListener('error', onError);
+            resolve(undefined);
+          };
+          
+          const onError = (e: Event) => {
+            video.removeEventListener('loadedmetadata', onLoadedMetadata);
+            video.removeEventListener('error', onError);
+            reject(new Error('Ошибка загрузки видео'));
+          };
+
+          video.addEventListener('loadedmetadata', onLoadedMetadata);
+          video.addEventListener('error', onError);
+        });
+
+        setIsScanning(true);
+        toast.success('Камера запущена');
       }
-      
-      setIsScanning(true);
     } catch (error) {
       console.error('Error starting camera:', error);
-      toast.error('Не удалось запустить камеру');
+      const errorMessage = error instanceof Error ? error.message : 'Не удалось запустить камеру';
+      setCameraError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -104,7 +160,17 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
+    
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+    
     setIsScanning(false);
+    setCameraError(null);
   };
 
   const processQRCode = async (qrData: string) => {
@@ -263,7 +329,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
         
         // Здесь можно добавить библиотеку для декодирования QR из изображения
         // Например, jsQR или qr-scanner
-        toast.info('Функция сканирования из файла будет добавлена');
+        toast.info('Функция сканирования из файла будет добавлена в следующем обновлении');
       };
       
       img.src = e.target?.result as string;
@@ -282,7 +348,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Camera className="h-5 w-5" />
-              <h2 className="text-lg font-semibold">Сканер QR-кодов</h2>
+              <h2 className="text-lg font-semibold">QR Сканер</h2>
             </div>
             <button
               onClick={onClose}
@@ -305,27 +371,43 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
               <div className="text-center mb-6">
                 {!isScanning ? (
                   <div className="space-y-4">
-                    <div className="w-64 h-64 bg-gray-100 dark:bg-dark-700 rounded-lg flex items-center justify-center mx-auto">
-                      <Camera className="h-16 w-16 text-gray-400" />
+                    <div className="w-64 h-64 bg-gray-100 dark:bg-dark-700 rounded-lg flex items-center justify-center mx-auto border-2 border-dashed border-gray-300 dark:border-dark-600">
+                      {cameraError ? (
+                        <div className="text-center">
+                          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-2" />
+                          <p className="text-sm text-red-600 dark:text-red-400 max-w-48">
+                            {cameraError}
+                          </p>
+                        </div>
+                      ) : (
+                        <Camera className="h-16 w-16 text-gray-400" />
+                      )}
                     </div>
+                    
                     <button
                       onClick={startCamera}
-                      className="btn-primary"
+                      disabled={loading}
+                      className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      Запустить камеру
+                      {loading ? 'Запуск камеры...' : 'Запустить камеру'}
                     </button>
                     
-                    {/* File Upload Alternative */}
-                    <div className="text-sm text-gray-500 dark:text-gray-400">
-                      или
-                      <label className="block mt-2">
+                    {/* Alternative Methods */}
+                    <div className="space-y-3">
+                      <div className="text-sm text-gray-500 dark:text-gray-400">
+                        или используйте альтернативные способы:
+                      </div>
+                      
+                      {/* File Upload */}
+                      <label className="block">
                         <input
                           type="file"
                           accept="image/*"
                           onChange={handleFileUpload}
                           className="hidden"
                         />
-                        <span className="btn-outline cursor-pointer">
+                        <span className="btn-outline cursor-pointer inline-flex items-center gap-2">
+                          <Upload className="h-4 w-4" />
                           Загрузить изображение QR-кода
                         </span>
                       </label>
@@ -338,14 +420,27 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
                         ref={videoRef}
                         autoPlay
                         playsInline
+                        muted
                         className="w-full h-full object-cover"
+                        style={{ transform: 'scaleX(-1)' }} // Зеркальное отображение для удобства
                       />
-                      <div className="absolute inset-4 border-2 border-primary-500 rounded-lg"></div>
+                      {/* QR scanning overlay */}
+                      <div className="absolute inset-4 border-2 border-primary-500 rounded-lg">
+                        <div className="absolute top-0 left-0 w-4 h-4 border-l-2 border-t-2 border-primary-500"></div>
+                        <div className="absolute top-0 right-0 w-4 h-4 border-r-2 border-t-2 border-primary-500"></div>
+                        <div className="absolute bottom-0 left-0 w-4 h-4 border-l-2 border-b-2 border-primary-500"></div>
+                        <div className="absolute bottom-0 right-0 w-4 h-4 border-r-2 border-b-2 border-primary-500"></div>
+                      </div>
+                      
+                      {/* Scanning line animation */}
+                      <div className="absolute inset-4 overflow-hidden">
+                        <div className="absolute w-full h-0.5 bg-primary-500 opacity-75 animate-pulse"></div>
+                      </div>
                     </div>
                     
                     <div className="space-y-2">
                       <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Наведите камеру на QR-код пользователя
+                        Наведите камеру на QR-код
                       </p>
                       <button
                         onClick={stopCamera}
@@ -354,23 +449,26 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
                         Остановить камеру
                       </button>
                     </div>
-
-                    {/* Manual Input */}
-                    <div className="mt-4 p-4 bg-gray-50 dark:bg-dark-700 rounded-lg">
-                      <p className="text-sm font-medium mb-2">Ручной ввод данных QR-кода:</p>
-                      <textarea
-                        placeholder="Вставьте данные QR-кода здесь..."
-                        className="w-full p-2 border border-gray-300 dark:border-dark-600 rounded-md dark:bg-dark-800"
-                        rows={3}
-                        onChange={(e) => {
-                          if (e.target.value.trim()) {
-                            processQRCode(e.target.value.trim());
-                          }
-                        }}
-                      />
-                    </div>
                   </div>
                 )}
+
+                {/* Manual Input */}
+                <div className="mt-6 p-4 bg-gray-50 dark:bg-dark-700 rounded-lg">
+                  <p className="text-sm font-medium mb-2">Ручной ввод данных QR-кода:</p>
+                  <textarea
+                    placeholder="Вставьте JSON данные QR-кода здесь..."
+                    className="w-full p-2 border border-gray-300 dark:border-dark-600 rounded-md dark:bg-dark-800 text-xs font-mono"
+                    rows={3}
+                    onChange={(e) => {
+                      if (e.target.value.trim()) {
+                        processQRCode(e.target.value.trim());
+                      }
+                    }}
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Скопируйте и вставьте данные QR-кода для тестирования
+                  </p>
+                </div>
               </div>
 
               {/* Recent Scans */}
@@ -507,4 +605,4 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
   );
 };
 
-export default QRScanner; 
+export default QRScanner;
