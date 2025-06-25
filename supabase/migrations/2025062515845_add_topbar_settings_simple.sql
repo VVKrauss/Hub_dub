@@ -1,107 +1,64 @@
--- Добавляем поле topbar_settings в таблицу site_settings
--- Файл: supabase/migrations/[timestamp]_add_topbar_settings.sql
+-- Безопасная миграция для добавления настроек топбара
+-- Файл: supabase/migrations/[timestamp]_add_topbar_settings_safe.sql
 
 -- Добавляем поле topbar_settings если его еще нет
 ALTER TABLE site_settings 
-ADD COLUMN IF NOT EXISTS topbar_settings jsonb DEFAULT '{
-  "alignment": "center",
-  "style": "classic", 
-  "spacing": "normal",
-  "showBorder": true,
-  "showShadow": true,
-  "backgroundColor": "white",
-  "animation": "slide",
-  "mobileCollapse": true,
-  "showIcons": false,
-  "showBadges": true,
-  "stickyHeader": true,
-  "maxWidth": "container"
-}';
+ADD COLUMN IF NOT EXISTS topbar_settings jsonb;
 
--- Обновляем структуру footer_settings для поддержки Instagram вместо VK
+-- Устанавливаем значения по умолчанию только если поле NULL
 UPDATE site_settings 
-SET footer_settings = jsonb_set(
-  jsonb_set(
-    COALESCE(footer_settings, '{}'::jsonb),
-    '{socialLinks,instagram}',
-    COALESCE((footer_settings->'socialLinks'->>'vk')::text, '""')::jsonb
-  ),
-  '{socialLinks}',
-  (COALESCE(footer_settings, '{}'::jsonb)->'socialLinks')::jsonb #- '{vk}'
+SET topbar_settings = jsonb_build_object(
+  'alignment', 'center',
+  'style', 'classic',
+  'spacing', 'normal',
+  'showBorder', true,
+  'showShadow', true,
+  'backgroundColor', 'white',
+  'animation', 'slide',
+  'mobileCollapse', true,
+  'showIcons', false,
+  'showBadges', true,
+  'stickyHeader', true,
+  'maxWidth', 'container'
 )
-WHERE footer_settings IS NOT NULL;
+WHERE topbar_settings IS NULL;
 
--- Обновляем существующие записи navigation_items, добавляя поле order если его нет
+-- Безопасно обновляем navigation_items, добавляя order только если его нет
 UPDATE site_settings 
 SET navigation_items = (
   SELECT jsonb_agg(
     CASE 
-      WHEN item ? 'order' THEN item
-      ELSE item || jsonb_build_object('order', row_number() OVER () - 1)
-    END ORDER BY 
-      CASE WHEN item ? 'order' THEN (item->>'order')::int ELSE row_number() OVER () - 1 END
+      WHEN jsonb_typeof(item) = 'object' AND item ? 'order' THEN item
+      WHEN jsonb_typeof(item) = 'object' THEN item || jsonb_build_object('order', ordinality - 1)
+      ELSE item
+    END
   )
-  FROM jsonb_array_elements(navigation_items) AS item
+  FROM jsonb_array_elements(navigation_items) WITH ORDINALITY AS item(item, ordinality)
 )
-WHERE navigation_items IS NOT NULL AND navigation_items != '[]'::jsonb;
+WHERE navigation_items IS NOT NULL 
+  AND jsonb_typeof(navigation_items) = 'array'
+  AND jsonb_array_length(navigation_items) > 0;
 
--- Обновляем существующие записи, добавляя значения по умолчанию для topbar_settings
-UPDATE site_settings 
-SET topbar_settings = '{
-  "alignment": "center",
-  "style": "classic", 
-  "spacing": "normal",
-  "showBorder": true,
-  "showShadow": true,
-  "backgroundColor": "white",
-  "animation": "slide",
-  "mobileCollapse": true,
-  "showIcons": false,
-  "showBadges": true,
-  "stickyHeader": true,
-  "maxWidth": "container"
-}'::jsonb
-WHERE topbar_settings IS NULL;
+-- Включаем RLS
+ALTER TABLE site_settings ENABLE ROW LEVEL SECURITY;
+
+-- Удаляем существующие политики если есть (чтобы избежать конфликтов)
+DROP POLICY IF EXISTS "Allow public read access" ON site_settings;
+DROP POLICY IF EXISTS "Allow authenticated update access" ON site_settings;
+DROP POLICY IF EXISTS "Allow authenticated insert access" ON site_settings;
+
+-- Создаем новые политики
+CREATE POLICY "Allow public read access" ON site_settings
+FOR SELECT USING (true);
+
+CREATE POLICY "Allow authenticated update access" ON site_settings
+FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+
+CREATE POLICY "Allow authenticated insert access" ON site_settings
+FOR INSERT TO authenticated WITH CHECK (true);
 
 -- Добавляем комментарий к новому полю
-COMMENT ON COLUMN site_settings.topbar_settings IS 'JSON настройки внешнего вида и поведения топбара (выравнивание, стиль, анимации и т.д.)';
+COMMENT ON COLUMN site_settings.topbar_settings IS 'JSON настройки внешнего вида и поведения топбара';
 
 -- Создаем индекс для быстрого поиска настроек топбара
 CREATE INDEX IF NOT EXISTS idx_site_settings_topbar ON site_settings USING gin (topbar_settings);
-
--- Создаем RLS политики если их еще нет
-DO $$ 
-BEGIN 
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_policies 
-        WHERE schemaname = 'public' 
-        AND tablename = 'site_settings' 
-        AND policyname = 'Allow public read access'
-    ) THEN
-        CREATE POLICY "Allow public read access" ON site_settings
-        FOR SELECT USING (true);
-    END IF;
-
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_policies 
-        WHERE schemaname = 'public' 
-        AND tablename = 'site_settings' 
-        AND policyname = 'Allow authenticated update access'
-    ) THEN
-        CREATE POLICY "Allow authenticated update access" ON site_settings
-        FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
-    END IF;
-
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_policies 
-        WHERE schemaname = 'public' 
-        AND tablename = 'site_settings' 
-        AND policyname = 'Allow authenticated insert access'
-    ) THEN
-        CREATE POLICY "Allow authenticated insert access" ON site_settings
-        FOR INSERT TO authenticated WITH CHECK (true);
-    END IF;
-END $$;
-
--- Включаем RLS если он не включен
-ALTER TABLE site_settings ENABLE ROW LEVEL SECURITY;
