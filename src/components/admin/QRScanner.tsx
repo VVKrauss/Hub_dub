@@ -1,9 +1,14 @@
 // src/components/admin/QRScanner.tsx
-import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Camera, X, CheckCircle, AlertCircle, Users, Calendar, MapPin, MessageSquare, Upload } from 'lucide-react';
+// ВАЖНО: Сначала установите библиотеку: npm install qr-scanner
+
+import React, { useState, useRef, useEffect } from 'react';
+import { Camera, X, CheckCircle, AlertCircle, Users } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
+
+// Импортируем QR Scanner библиотеку
+import QrScanner from 'qr-scanner';
 
 interface QRScannerProps {
   isOpen: boolean;
@@ -42,7 +47,7 @@ interface AttendanceRecord {
   };
 }
 
-const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
+const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
   const { user } = useAuth();
   const [isScanning, setIsScanning] = useState(false);
   const [scannedUser, setScannedUser] = useState<ScannedUser | null>(null);
@@ -50,17 +55,17 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
   const [recentScans, setRecentScans] = useState<AttendanceRecord[]>([]);
   const [location, setLocation] = useState('');
   const [notes, setNotes] = useState('');
-  const [cameraError, setCameraError] = useState<string | null>(null);
-  const [videoLoaded, setVideoLoaded] = useState(false);
+  const [scannerError, setScannerError] = useState<string | null>(null);
+  
   const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  const qrScannerRef = useRef<QrScanner | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       fetchRecentScans();
     }
     return () => {
-      stopCamera();
+      stopScanner();
     };
   }, [isOpen]);
 
@@ -83,160 +88,81 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
     }
   };
 
-  const startCamera = async () => {
+  const startScanner = async () => {
     try {
-      console.log('🔍 Запуск камеры...');
-      setCameraError(null);
+      console.log('🚀 Запуск QR сканера...');
+      setScannerError(null);
       setLoading(true);
-      setVideoLoaded(false);
 
-      // Останавливаем предыдущий поток
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-        streamRef.current = null;
-      }
-
-      if (!navigator.mediaDevices?.getUserMedia) {
-        throw new Error('Камера не поддерживается');
-      }
-
-      // Простые настройки камеры
-      const constraints = {
-        video: {
-          facingMode: { ideal: 'environment' },
-          width: { ideal: 640 },
-          height: { ideal: 480 }
-        },
-        audio: false
-      };
-
-      console.log('🎥 Получение потока...');
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      console.log('✅ Поток получен:', stream);
-      console.log('📊 Треки:', stream.getVideoTracks().length);
-
-      if (videoRef.current) {
-        const video = videoRef.current;
-        
-        // Очищаем предыдущий источник
-        video.srcObject = null;
-        
-        // Устанавливаем новый поток
-        video.srcObject = stream;
-        streamRef.current = stream;
-        
-        // Настройки видео для лучшей совместимости
-        video.muted = true;
-        video.playsInline = true;
-        video.autoplay = true;
-        
-        // Обработчики событий
-        const handleLoadedMetadata = () => {
-          console.log('📺 Метаданные загружены');
-          console.log('📐 Размеры видео:', video.videoWidth, 'x', video.videoHeight);
-          setVideoLoaded(true);
-        };
-
-        const handleCanPlay = () => {
-          console.log('▶️ Видео готово к воспроизведению');
-          video.play().then(() => {
-            console.log('✅ Воспроизведение началось');
-            setIsScanning(true);
-            toast.success('Камера запущена');
-          }).catch(err => {
-            console.error('❌ Ошибка воспроизведения:', err);
-            setCameraError('Ошибка воспроизведения видео');
-          });
-        };
-
-        const handleError = (event: Event) => {
-          console.error('❌ Ошибка видео:', event);
-          setCameraError('Ошибка видео элемента');
-        };
-
-        // Добавляем обработчики
-        video.addEventListener('loadedmetadata', handleLoadedMetadata);
-        video.addEventListener('canplay', handleCanPlay);
-        video.addEventListener('error', handleError);
-
-        // Очистка при размонтировании
-        const cleanup = () => {
-          video.removeEventListener('loadedmetadata', handleLoadedMetadata);
-          video.removeEventListener('canplay', handleCanPlay);
-          video.removeEventListener('error', handleError);
-        };
-
-        // Сохраняем функцию очистки
-        video.dataset.cleanup = 'true';
-
-        // Принудительно загружаем видео
-        video.load();
-
-        // Таймаут для отладки
-        setTimeout(() => {
-          if (!videoLoaded) {
-            console.warn('⚠️ Видео не загрузилось за 3 секунды');
-            console.log('📊 Состояние видео:', {
-              readyState: video.readyState,
-              networkState: video.networkState,
-              videoWidth: video.videoWidth,
-              videoHeight: video.videoHeight,
-              paused: video.paused,
-              srcObject: !!video.srcObject
-            });
-          }
-        }, 3000);
-
-      } else {
+      if (!videoRef.current) {
         throw new Error('Видео элемент не найден');
       }
 
+      // Создаем экземпляр QR сканера
+      const qrScanner = new QrScanner(
+        videoRef.current,
+        (result) => {
+          console.log('✅ QR код распознан:', result.data);
+          processQRCode(result.data);
+        },
+        {
+          // Настройки сканера
+          returnDetailedScanResult: true,
+          highlightScanRegion: true,
+          highlightCodeOutline: true,
+          preferredCamera: 'environment', // Задняя камера
+          maxScansPerSecond: 5,
+        }
+      );
+
+      qrScannerRef.current = qrScanner;
+
+      // Запускаем сканер
+      await qrScanner.start();
+      
+      console.log('✅ QR сканер запущен');
+      setIsScanning(true);
+      toast.success('Сканер запущен');
+
     } catch (error) {
-      console.error('❌ Ошибка камеры:', error);
-      let message = 'Ошибка запуска камеры';
+      console.error('❌ Ошибка запуска сканера:', error);
+      let message = 'Ошибка запуска сканера';
       
       if (error instanceof Error) {
-        if (error.name === 'NotAllowedError') {
-          message = 'Доступ запрещен. Разрешите камеру в настройках.';
-        } else if (error.name === 'NotFoundError') {
-          message = 'Камера не найдена.';
-        } else if (error.name === 'NotReadableError') {
-          message = 'Камера занята другим приложением.';
+        if (error.message.includes('Permission denied')) {
+          message = 'Доступ к камере запрещен';
+        } else if (error.message.includes('not found')) {
+          message = 'Камера не найдена';
+        } else if (error.message.includes('in use')) {
+          message = 'Камера занята другим приложением';
         } else {
           message = error.message;
         }
       }
       
-      setCameraError(message);
+      setScannerError(message);
       toast.error(message);
     } finally {
       setLoading(false);
     }
   };
 
-  const stopCamera = () => {
-    console.log('🛑 Остановка камеры...');
+  const stopScanner = () => {
+    console.log('🛑 Остановка сканера...');
     
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => {
-        console.log('🔇 Остановка трека:', track.kind);
-        track.stop();
-      });
-      streamRef.current = null;
-    }
-    
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-      videoRef.current.load(); // Принудительно сбрасываем
+    if (qrScannerRef.current) {
+      qrScannerRef.current.stop();
+      qrScannerRef.current.destroy();
+      qrScannerRef.current = null;
     }
     
     setIsScanning(false);
-    setVideoLoaded(false);
-    setCameraError(null);
+    setScannerError(null);
   };
 
   const processQRCode = async (qrData: string) => {
     try {
+      console.log('🔍 Обработка QR кода:', qrData);
       const parsed = JSON.parse(qrData);
       
       if (parsed.type === 'user_attendance' && parsed.userId && parsed.qrToken) {
@@ -258,7 +184,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
           qrToken: profile.qr_token
         });
 
-        stopCamera();
+        stopScanner();
         return;
       }
       
@@ -299,13 +225,13 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
           }
         });
 
-        stopCamera();
+        stopScanner();
         return;
       }
       
-      throw new Error('Неверный QR-код');
+      throw new Error('Неверный формат QR-кода');
     } catch (error) {
-      console.error('QR processing error:', error);
+      console.error('❌ Ошибка обработки QR:', error);
       toast.error(error instanceof Error ? error.message : 'Ошибка QR-кода');
     }
   };
@@ -342,7 +268,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
           .eq('user_id', scannedUser.userId);
       }
 
-      toast.success(`Посещение отмечено: ${scannedUser.userName}`);
+      toast.success(`✅ Посещение отмечено: ${scannedUser.userName}`);
       
       setScannedUser(null);
       setLocation('');
@@ -354,6 +280,12 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
       toast.error('Ошибка записи посещения');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleManualInput = (qrText: string) => {
+    if (qrText.trim()) {
+      processQRCode(qrText.trim());
     }
   };
 
@@ -386,11 +318,11 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
                 {!isScanning ? (
                   <div className="space-y-4">
                     <div className="w-full aspect-square max-w-64 mx-auto bg-gray-100 dark:bg-dark-700 rounded-lg flex items-center justify-center border-2 border-dashed border-gray-300 dark:border-dark-600">
-                      {cameraError ? (
+                      {scannerError ? (
                         <div className="text-center p-4">
                           <AlertCircle className="h-8 w-8 text-red-500 mx-auto mb-2" />
                           <p className="text-xs text-red-600 dark:text-red-400">
-                            {cameraError}
+                            {scannerError}
                           </p>
                         </div>
                       ) : (
@@ -399,55 +331,37 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
                     </div>
                     
                     <button
-                      onClick={startCamera}
+                      onClick={startScanner}
                       disabled={loading}
                       className="w-full btn-primary disabled:opacity-50 py-3 text-lg font-medium"
                     >
-                      {loading ? 'Запуск...' : '📱 Запустить камеру'}
+                      {loading ? '🔄 Запуск...' : '📱 Запустить сканер'}
                     </button>
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    <div className="relative w-full aspect-square max-w-64 mx-auto bg-black rounded-lg overflow-hidden">
+                    {/* Видео элемент для QR сканера */}
+                    <div className="relative w-full aspect-square max-w-64 mx-auto rounded-lg overflow-hidden">
                       <video
                         ref={videoRef}
                         className="w-full h-full object-cover"
-                        style={{ 
-                          display: videoLoaded ? 'block' : 'none',
-                          transform: 'scaleX(-1)' // Зеркально для удобства
-                        }}
+                        style={{ transform: 'scaleX(-1)' }}
                       />
-                      
-                      {/* Показываем загрузку если видео не готово */}
-                      {!videoLoaded && (
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="text-white text-center">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
-                            <p className="text-sm">Загрузка видео...</p>
-                          </div>
-                        </div>
-                      )}
-                      
-                      {/* Scanning overlay */}
-                      {videoLoaded && (
-                        <div className="absolute inset-4 border-2 border-primary-500 rounded-lg">
-                          <div className="absolute top-0 left-0 w-4 h-4 border-l-2 border-t-2 border-white"></div>
-                          <div className="absolute top-0 right-0 w-4 h-4 border-r-2 border-t-2 border-white"></div>
-                          <div className="absolute bottom-0 left-0 w-4 h-4 border-l-2 border-b-2 border-white"></div>
-                          <div className="absolute bottom-0 right-0 w-4 h-4 border-r-2 border-b-2 border-white"></div>
-                        </div>
-                      )}
+                      {/* Overlay от библиотеки сам добавит подсветку QR кодов */}
                     </div>
                     
                     <div className="space-y-2">
                       <p className="text-sm text-gray-600 dark:text-gray-400">
-                        📷 Наведите на QR-код
+                        🎯 Наведите на QR-код
+                      </p>
+                      <p className="text-xs text-green-600 dark:text-green-400">
+                        ✨ Автоматическое распознавание
                       </p>
                       <button
-                        onClick={stopCamera}
+                        onClick={stopScanner}
                         className="w-full btn-outline py-2"
                       >
-                        Остановить
+                        ⏹️ Остановить
                       </button>
                     </div>
                   </div>
@@ -455,25 +369,21 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
 
                 {/* Manual Input */}
                 <div className="mt-4 p-3 bg-gray-50 dark:bg-dark-700 rounded-lg">
-                  <p className="text-sm font-medium mb-2">Ручной ввод:</p>
+                  <p className="text-sm font-medium mb-2">💻 Ручной ввод:</p>
                   <textarea
                     placeholder="Вставьте JSON данные QR-кода..."
                     className="w-full p-2 border border-gray-300 dark:border-dark-600 rounded text-xs font-mono"
                     rows={2}
-                    onChange={(e) => {
-                      if (e.target.value.trim()) {
-                        processQRCode(e.target.value.trim());
-                      }
-                    }}
+                    onChange={(e) => handleManualInput(e.target.value)}
                   />
                 </div>
               </div>
 
-              {/* Recent Scans - Compact for mobile */}
+              {/* Recent Scans */}
               <div>
                 <h3 className="text-base font-semibold mb-2 flex items-center gap-2">
                   <Users className="h-4 w-4" />
-                  Недавние сканы
+                  📋 Недавние сканы
                 </h3>
                 
                 {recentScans.length > 0 ? (
@@ -520,10 +430,10 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
                   {scannedUser.registrationData && (
                     <div className="mt-2 pt-2 border-t border-gray-200 dark:border-dark-600 text-sm">
                       <p className="font-medium text-primary-600">
-                        {scannedUser.registrationData.eventTitle}
+                        🎫 {scannedUser.registrationData.eventTitle}
                       </p>
                       <p className="text-xs">
-                        🎫 {scannedUser.registrationData.adultTickets} взрослых
+                        👥 {scannedUser.registrationData.adultTickets} взрослых
                         {scannedUser.registrationData.childTickets > 0 && 
                           `, ${scannedUser.registrationData.childTickets} детей`
                         }
@@ -535,7 +445,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
                   )}
                   
                   <p className="text-xs text-gray-400 mt-2">
-                    ID: {scannedUser.qrToken.slice(0, 8)}...
+                    🆔 {scannedUser.qrToken.slice(0, 8)}...
                   </p>
                 </div>
               </div>
@@ -593,4 +503,4 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
   );
 };
 
-export default QRScanner;
+export default QRScannerComponent;
