@@ -1,6 +1,4 @@
 // src/components/admin/QRScanner.tsx
-// Установите: npm install @zxing/library
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Camera, X, CheckCircle, AlertCircle, Users } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -55,6 +53,7 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
   const [notes, setNotes] = useState('');
   const [scannerError, setScannerError] = useState<string | null>(null);
   const [lastScanTime, setLastScanTime] = useState<number>(0);
+  const [videoReady, setVideoReady] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
@@ -69,6 +68,22 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
       stopScanner();
     };
   }, [isOpen]);
+
+  // Проверяем готовность видео элемента
+  useEffect(() => {
+    const checkVideoReady = () => {
+      if (videoRef.current && isScanning) {
+        setVideoReady(true);
+      } else {
+        setVideoReady(false);
+      }
+    };
+
+    checkVideoReady();
+    const interval = setInterval(checkVideoReady, 100);
+    
+    return () => clearInterval(interval);
+  }, [isScanning]);
 
   const fetchRecentScans = async () => {
     try {
@@ -100,9 +115,10 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
       const parsed = JSON.parse(qrData);
       
       if (parsed.type === 'user_attendance' && parsed.userId && parsed.qrToken) {
+        // Исправленный запрос без email колонки
         const { data: profile, error } = await supabase
           .from('profiles')
-          .select('id, name, email, qr_token')
+          .select('id, name, qr_token')
           .eq('id', parsed.userId)
           .eq('qr_token', parsed.qrToken)
           .single();
@@ -113,8 +129,8 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
 
         setScannedUser({
           userId: profile.id,
-          userName: profile.name || profile.email.split('@')[0],
-          userEmail: profile.email,
+          userName: profile.name || `Пользователь ${profile.id.slice(0, 8)}`,
+          userEmail: parsed.userEmail || 'Не указан', // Берем из QR-кода
           qrToken: profile.qr_token
         });
 
@@ -128,7 +144,7 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
           .select(`
             *,
             event:events(id, title, start_at, location),
-            profile:profiles(id, name, email)
+            profile:profiles(id, name)
           `)
           .eq('registration_id', parsed.registrationId)
           .eq('event_id', parsed.eventId)
@@ -176,12 +192,14 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
       setScannerError(null);
       setLoading(true);
 
+      // Ждем инициализации компонента
+      await new Promise(resolve => setTimeout(resolve, 500));
+
       if (!videoRef.current) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        if (!videoRef.current) {
-          throw new Error('Видео элемент не готов');
-        }
+        throw new Error('Видео элемент не готов. Попробуйте еще раз через секунду.');
       }
+
+      console.log('✅ Видео элемент найден');
 
       // Создаем новый экземпляр ридера
       const codeReader = new BrowserMultiFormatReader();
@@ -196,19 +214,8 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
 
       console.log(`✅ Найдено камер: ${videoInputDevices.length}`);
       
-      // Ищем заднюю камеру
-      let selectedDeviceId = videoInputDevices[0].deviceId;
-      
-      for (const device of videoInputDevices) {
-        console.log(`📹 Камера: ${device.label || 'Без названия'}`);
-        if (device.label.toLowerCase().includes('back') || 
-            device.label.toLowerCase().includes('rear') ||
-            device.label.toLowerCase().includes('environment')) {
-          selectedDeviceId = device.deviceId;
-          console.log('✅ Выбрана задняя камера');
-          break;
-        }
-      }
+      // Выбираем первую доступную камеру
+      const selectedDeviceId = videoInputDevices[0].deviceId;
 
       // Запускаем декодирование
       console.log('🎯 Запуск декодирования...');
@@ -222,7 +229,8 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
           }
           
           if (error && !(error instanceof NotFoundException)) {
-            console.warn('⚠️ Ошибка декодирования:', error);
+            // Игнорируем обычные ошибки "не найден"
+            console.warn('⚠️ Ошибка декодирования:', error.message);
           }
         }
       );
@@ -236,11 +244,13 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
       
       if (error instanceof Error) {
         if (error.message.includes('Permission denied') || error.name === 'NotAllowedError') {
-          message = '🚫 Доступ к камере запрещен';
+          message = '🚫 Доступ к камере запрещен. Разрешите доступ в настройках браузера.';
         } else if (error.message.includes('not found') || error.name === 'NotFoundError') {
-          message = '📷 Камера не найдена';
+          message = '📷 Камера не найдена. Проверьте подключение камеры.';
         } else if (error.message.includes('in use') || error.name === 'NotReadableError') {
-          message = '🔒 Камера занята';
+          message = '🔒 Камера занята другим приложением.';
+        } else if (error.message.includes('Видео элемент не готов')) {
+          message = '⏳ Подождите секунду и попробуйте снова.';
         } else {
           message = `❌ ${error.message}`;
         }
@@ -269,6 +279,7 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
     setIsScanning(false);
     setScannerError(null);
     setLastScanTime(0);
+    setVideoReady(false);
   }, []);
 
   const confirmAttendance = async () => {
@@ -395,15 +406,27 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
                       />
                       
                       {/* Overlay сканирования */}
-                      <div className="absolute inset-4 border-2 border-primary-500 rounded-lg">
-                        <div className="absolute top-0 left-0 w-6 h-6 border-l-4 border-t-4 border-white rounded-tl"></div>
-                        <div className="absolute top-0 right-0 w-6 h-6 border-r-4 border-t-4 border-white rounded-tr"></div>
-                        <div className="absolute bottom-0 left-0 w-6 h-6 border-l-4 border-b-4 border-white rounded-bl"></div>
-                        <div className="absolute bottom-0 right-0 w-6 h-6 border-r-4 border-b-4 border-white rounded-br"></div>
-                        
-                        {/* Анимированная линия сканирования */}
-                        <div className="absolute top-1/2 left-4 right-4 h-0.5 bg-primary-400 opacity-80 animate-pulse"></div>
-                      </div>
+                      {videoReady && (
+                        <div className="absolute inset-4 border-2 border-primary-500 rounded-lg">
+                          <div className="absolute top-0 left-0 w-6 h-6 border-l-4 border-t-4 border-white rounded-tl"></div>
+                          <div className="absolute top-0 right-0 w-6 h-6 border-r-4 border-t-4 border-white rounded-tr"></div>
+                          <div className="absolute bottom-0 left-0 w-6 h-6 border-l-4 border-b-4 border-white rounded-bl"></div>
+                          <div className="absolute bottom-0 right-0 w-6 h-6 border-r-4 border-b-4 border-white rounded-br"></div>
+                          
+                          {/* Анимированная линия сканирования */}
+                          <div className="absolute top-1/2 left-4 right-4 h-0.5 bg-primary-400 opacity-80 animate-pulse"></div>
+                        </div>
+                      )}
+                      
+                      {/* Индикатор загрузки видео */}
+                      {!videoReady && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="text-white text-center">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
+                            <p className="text-sm">Загрузка видео...</p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                     
                     <div className="space-y-2">
@@ -411,7 +434,7 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
                         🎯 Наведите на QR-код
                       </p>
                       <p className="text-xs text-green-600 dark:text-green-400">
-                        ⚡ ZXing Engine
+                        ⚡ {videoReady ? 'Видео готово' : 'Загрузка...'}
                       </p>
                       <button
                         onClick={stopScanner}
@@ -433,7 +456,7 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
                     onChange={handleManualInput}
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    Тест: {"{"}"type":"user_attendance","userId":"test","qrToken":"test123","userName":"Test","userEmail":"test@test.com","timestamp":1703025600000{"}"}
+                    Тест: {"{"}"type":"user_attendance","userId":"test","qrToken":"test123","userName":"Test User","userEmail":"test@test.com","timestamp":1703025600000{"}"}
                   </p>
                 </div>
               </div>
@@ -475,7 +498,7 @@ const QRScannerComponent: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId
               </div>
             </div>
           ) : (
-            /* Confirmation Screen - same as before */
+            /* Confirmation Screen */
             <div className="space-y-4">
               <div className="text-center">
                 <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-3" />
