@@ -8,7 +8,7 @@ import { useAuth } from '../../contexts/AuthContext';
 interface QRScannerProps {
   isOpen: boolean;
   onClose: () => void;
-  eventId?: string; // Опционально для привязки к событию
+  eventId?: string;
 }
 
 interface ScannedUser {
@@ -53,7 +53,6 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
   const [cameraError, setCameraError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const animationFrameRef = useRef<number>();
 
   useEffect(() => {
     if (isOpen) {
@@ -61,9 +60,6 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
     }
     return () => {
       stopCamera();
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
     };
   }, [isOpen]);
 
@@ -77,7 +73,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
           events(title)
         `)
         .order('scanned_at', { ascending: false })
-        .limit(10);
+        .limit(5); // Меньше для мобильных
 
       if (error) throw error;
       setRecentScans(data || []);
@@ -91,22 +87,19 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
       setCameraError(null);
       setLoading(true);
 
-      // Останавливаем предыдущий поток если есть
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
       }
 
-      // Проверяем доступность камеры
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Камера не поддерживается в этом браузере');
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error('Камера не поддерживается');
       }
 
-      // Запрашиваем доступ к камере
       const constraints = {
         video: {
-          facingMode: { ideal: 'environment' }, // Предпочитаем заднюю камеру
-          width: { ideal: 640 },
-          height: { ideal: 480 }
+          facingMode: 'environment',
+          width: { ideal: 640, max: 1280 },
+          height: { ideal: 480, max: 720 }
         },
         audio: false
       };
@@ -117,28 +110,19 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
         videoRef.current.srcObject = stream;
         streamRef.current = stream;
         
-        // Ждем когда видео загрузится
         await new Promise((resolve, reject) => {
-          if (!videoRef.current) {
-            reject(new Error('Video element not found'));
-            return;
-          }
-
-          const video = videoRef.current;
-          
-          const onLoadedMetadata = () => {
-            video.removeEventListener('loadedmetadata', onLoadedMetadata);
+          const video = videoRef.current!;
+          const onLoaded = () => {
+            video.removeEventListener('loadedmetadata', onLoaded);
             video.removeEventListener('error', onError);
             resolve(undefined);
           };
-          
-          const onError = (e: Event) => {
-            video.removeEventListener('loadedmetadata', onLoadedMetadata);
+          const onError = () => {
+            video.removeEventListener('loadedmetadata', onLoaded);
             video.removeEventListener('error', onError);
             reject(new Error('Ошибка загрузки видео'));
           };
-
-          video.addEventListener('loadedmetadata', onLoadedMetadata);
+          video.addEventListener('loadedmetadata', onLoaded);
           video.addEventListener('error', onError);
         });
 
@@ -146,10 +130,10 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
         toast.success('Камера запущена');
       }
     } catch (error) {
-      console.error('Error starting camera:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Не удалось запустить камеру';
-      setCameraError(errorMessage);
-      toast.error(errorMessage);
+      console.error('Camera error:', error);
+      const message = error instanceof Error ? error.message : 'Ошибка камеры';
+      setCameraError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -160,15 +144,9 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
-    
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
-    
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-    }
-    
     setIsScanning(false);
     setCameraError(null);
   };
@@ -177,9 +155,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
     try {
       const parsed = JSON.parse(qrData);
       
-      // Обработка QR-кода пользователя для посещений
       if (parsed.type === 'user_attendance' && parsed.userId && parsed.qrToken) {
-        // Проверяем валидность токена
         const { data: profile, error } = await supabase
           .from('profiles')
           .select('id, name, email, qr_token')
@@ -188,7 +164,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
           .single();
 
         if (error || !profile) {
-          throw new Error('QR-код недействителен или устарел');
+          throw new Error('QR-код недействителен');
         }
 
         setScannedUser({
@@ -202,9 +178,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
         return;
       }
       
-      // Обработка QR-кода регистрации на мероприятие
       if (parsed.type === 'event_registration' && parsed.registrationId && parsed.eventId) {
-        // Проверяем валидность регистрации
         const { data: registration, error } = await supabase
           .from('user_event_registrations')
           .select(`
@@ -218,21 +192,18 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
           .single();
 
         if (error || !registration) {
-          throw new Error('Регистрация не найдена или неактивна');
+          throw new Error('Регистрация не найдена');
         }
 
-        // Проверяем соответствие данных в QR-коде
-        if (registration.full_name !== parsed.fullName || 
-            registration.email !== parsed.email) {
-          throw new Error('Данные в QR-коде не соответствуют регистрации');
+        if (registration.full_name !== parsed.fullName || registration.email !== parsed.email) {
+          throw new Error('Данные не соответствуют');
         }
 
-        // Устанавливаем данные как для обычного пользователя, но с дополнительной информацией о регистрации
         setScannedUser({
           userId: registration.user_id,
           userName: registration.full_name,
           userEmail: registration.email,
-          qrToken: parsed.registrationId, // Используем ID регистрации как токен
+          qrToken: parsed.registrationId,
           registrationData: {
             registrationId: registration.registration_id,
             eventId: registration.event_id,
@@ -248,11 +219,10 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
         return;
       }
       
-      throw new Error('Неверный формат QR-кода');
-      
+      throw new Error('Неверный QR-код');
     } catch (error) {
-      console.error('Error processing QR code:', error);
-      toast.error(error instanceof Error ? error.message : 'Ошибка обработки QR-кода');
+      console.error('QR processing error:', error);
+      toast.error(error instanceof Error ? error.message : 'Ошибка QR-кода');
     }
   };
 
@@ -277,9 +247,8 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
 
       if (error) throw error;
 
-      // Если это регистрация на мероприятие, также отмечаем посещение в таблице регистраций
       if (scannedUser.registrationData) {
-        const { error: regError } = await supabase
+        await supabase
           .from('user_event_registrations')
           .update({ 
             attended_at: new Date().toISOString(),
@@ -287,62 +256,28 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
           })
           .eq('registration_id', scannedUser.registrationData.registrationId)
           .eq('user_id', scannedUser.userId);
-
-        if (regError) {
-          console.error('Error updating registration attendance:', regError);
-          // Не показываем ошибку пользователю, основная запись посещения прошла успешно
-        }
       }
 
-      toast.success(`Посещение отмечено для ${scannedUser.userName}`);
+      toast.success(`Посещение отмечено: ${scannedUser.userName}`);
       
-      // Сбрасываем состояние
       setScannedUser(null);
       setLocation('');
       setNotes('');
-      
-      // Обновляем список недавних сканирований
       await fetchRecentScans();
       
     } catch (error) {
-      console.error('Error recording attendance:', error);
-      toast.error('Ошибка при записи посещения');
+      console.error('Attendance error:', error);
+      toast.error('Ошибка записи посещения');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      const img = new Image();
-      
-      img.onload = () => {
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx?.drawImage(img, 0, 0);
-        
-        // Здесь можно добавить библиотеку для декодирования QR из изображения
-        // Например, jsQR или qr-scanner
-        toast.info('Функция сканирования из файла будет добавлена в следующем обновлении');
-      };
-      
-      img.src = e.target?.result as string;
-    };
-    
-    reader.readAsDataURL(file);
-  };
-
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-dark-800 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2">
+      <div className="bg-white dark:bg-dark-800 rounded-lg shadow-xl w-full max-w-md max-h-[95vh] overflow-hidden">
         {/* Header */}
         <div className="bg-gradient-to-r from-primary-500 to-primary-600 p-4 text-white">
           <div className="flex items-center justify-between">
@@ -352,249 +287,204 @@ const QRScanner: React.FC<QRScannerProps> = ({ isOpen, onClose, eventId }) => {
             </div>
             <button
               onClick={onClose}
-              className="text-white hover:text-gray-200 transition-colors"
+              className="text-white hover:text-gray-200 transition-colors p-1"
             >
               <X className="h-6 w-6" />
             </button>
           </div>
-          {eventId && (
-            <p className="text-primary-100 text-sm mt-1">
-              Отметка посещения мероприятия
-            </p>
-          )}
         </div>
 
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-80px)]">
+        <div className="p-4 overflow-y-auto max-h-[calc(95vh-80px)]">
           {!scannedUser ? (
-            <>
+            <div className="space-y-4">
               {/* Scanner Interface */}
-              <div className="text-center mb-6">
+              <div className="text-center">
                 {!isScanning ? (
                   <div className="space-y-4">
-                    <div className="w-64 h-64 bg-gray-100 dark:bg-dark-700 rounded-lg flex items-center justify-center mx-auto border-2 border-dashed border-gray-300 dark:border-dark-600">
+                    <div className="w-full aspect-square max-w-64 mx-auto bg-gray-100 dark:bg-dark-700 rounded-lg flex items-center justify-center border-2 border-dashed border-gray-300 dark:border-dark-600">
                       {cameraError ? (
-                        <div className="text-center">
-                          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-2" />
-                          <p className="text-sm text-red-600 dark:text-red-400 max-w-48">
+                        <div className="text-center p-4">
+                          <AlertCircle className="h-8 w-8 text-red-500 mx-auto mb-2" />
+                          <p className="text-xs text-red-600 dark:text-red-400">
                             {cameraError}
                           </p>
                         </div>
                       ) : (
-                        <Camera className="h-16 w-16 text-gray-400" />
+                        <Camera className="h-12 w-12 text-gray-400" />
                       )}
                     </div>
                     
                     <button
                       onClick={startCamera}
                       disabled={loading}
-                      className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full btn-primary disabled:opacity-50 py-3 text-lg font-medium"
                     >
-                      {loading ? 'Запуск камеры...' : 'Запустить камеру'}
+                      {loading ? 'Запуск...' : '📱 Запустить камеру'}
                     </button>
-                    
-                    {/* Alternative Methods */}
-                    <div className="space-y-3">
-                      <div className="text-sm text-gray-500 dark:text-gray-400">
-                        или используйте альтернативные способы:
-                      </div>
-                      
-                      {/* File Upload */}
-                      <label className="block">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleFileUpload}
-                          className="hidden"
-                        />
-                        <span className="btn-outline cursor-pointer inline-flex items-center gap-2">
-                          <Upload className="h-4 w-4" />
-                          Загрузить изображение QR-кода
-                        </span>
-                      </label>
-                    </div>
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    <div className="relative w-64 h-64 mx-auto bg-black rounded-lg overflow-hidden">
+                    <div className="relative w-full aspect-square max-w-64 mx-auto bg-black rounded-lg overflow-hidden">
                       <video
                         ref={videoRef}
                         autoPlay
                         playsInline
                         muted
                         className="w-full h-full object-cover"
-                        style={{ transform: 'scaleX(-1)' }} // Зеркальное отображение для удобства
                       />
-                      {/* QR scanning overlay */}
+                      {/* Scanning overlay */}
                       <div className="absolute inset-4 border-2 border-primary-500 rounded-lg">
-                        <div className="absolute top-0 left-0 w-4 h-4 border-l-2 border-t-2 border-primary-500"></div>
-                        <div className="absolute top-0 right-0 w-4 h-4 border-r-2 border-t-2 border-primary-500"></div>
-                        <div className="absolute bottom-0 left-0 w-4 h-4 border-l-2 border-b-2 border-primary-500"></div>
-                        <div className="absolute bottom-0 right-0 w-4 h-4 border-r-2 border-b-2 border-primary-500"></div>
-                      </div>
-                      
-                      {/* Scanning line animation */}
-                      <div className="absolute inset-4 overflow-hidden">
-                        <div className="absolute w-full h-0.5 bg-primary-500 opacity-75 animate-pulse"></div>
+                        <div className="absolute top-0 left-0 w-4 h-4 border-l-2 border-t-2 border-white"></div>
+                        <div className="absolute top-0 right-0 w-4 h-4 border-r-2 border-t-2 border-white"></div>
+                        <div className="absolute bottom-0 left-0 w-4 h-4 border-l-2 border-b-2 border-white"></div>
+                        <div className="absolute bottom-0 right-0 w-4 h-4 border-r-2 border-b-2 border-white"></div>
                       </div>
                     </div>
                     
                     <div className="space-y-2">
                       <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Наведите камеру на QR-код
+                        📷 Наведите на QR-код
                       </p>
                       <button
                         onClick={stopCamera}
-                        className="btn-outline"
+                        className="w-full btn-outline py-2"
                       >
-                        Остановить камеру
+                        Остановить
                       </button>
                     </div>
                   </div>
                 )}
 
                 {/* Manual Input */}
-                <div className="mt-6 p-4 bg-gray-50 dark:bg-dark-700 rounded-lg">
-                  <p className="text-sm font-medium mb-2">Ручной ввод данных QR-кода:</p>
+                <div className="mt-4 p-3 bg-gray-50 dark:bg-dark-700 rounded-lg">
+                  <p className="text-sm font-medium mb-2">Ручной ввод:</p>
                   <textarea
-                    placeholder="Вставьте JSON данные QR-кода здесь..."
-                    className="w-full p-2 border border-gray-300 dark:border-dark-600 rounded-md dark:bg-dark-800 text-xs font-mono"
-                    rows={3}
+                    placeholder="Вставьте JSON данные QR-кода..."
+                    className="w-full p-2 border border-gray-300 dark:border-dark-600 rounded text-xs font-mono"
+                    rows={2}
                     onChange={(e) => {
                       if (e.target.value.trim()) {
                         processQRCode(e.target.value.trim());
                       }
                     }}
                   />
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Скопируйте и вставьте данные QR-кода для тестирования
-                  </p>
                 </div>
               </div>
 
-              {/* Recent Scans */}
+              {/* Recent Scans - Compact for mobile */}
               <div>
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  Недавние сканирования
+                <h3 className="text-base font-semibold mb-2 flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Недавние сканы
                 </h3>
                 
                 {recentScans.length > 0 ? (
-                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                  <div className="space-y-2">
                     {recentScans.map((scan) => (
                       <div
                         key={scan.id}
-                        className="flex items-center justify-between p-3 bg-gray-50 dark:bg-dark-700 rounded-lg"
+                        className="flex items-center justify-between p-2 bg-gray-50 dark:bg-dark-700 rounded text-sm"
                       >
-                        <div>
-                          <p className="font-medium">{scan.profiles.name}</p>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">
-                            {new Date(scan.scanned_at).toLocaleString('ru-RU')}
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium truncate">{scan.profiles.name}</p>
+                          <p className="text-xs text-gray-500">
+                            {new Date(scan.scanned_at).toLocaleString('ru-RU', {
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
                           </p>
-                          {scan.events && (
-                            <p className="text-xs text-primary-600 dark:text-primary-400">
-                              {scan.events.title}
-                            </p>
-                          )}
                         </div>
-                        <CheckCircle className="h-5 w-5 text-green-500" />
+                        <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-gray-500 dark:text-gray-400 text-center py-4">
-                    Пока нет записей о посещениях
+                  <p className="text-gray-500 text-center py-3 text-sm">
+                    Нет сканов
                   </p>
                 )}
               </div>
-            </>
+            </div>
           ) : (
             /* Confirmation Screen */
-            <div className="space-y-6">
+            <div className="space-y-4">
               <div className="text-center">
-                <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold mb-2">
-                  {scannedUser.registrationData ? 'Регистрация найдена' : 'Пользователь найден'}
+                <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-3" />
+                <h3 className="text-lg font-semibold mb-2">
+                  {scannedUser.registrationData ? '✅ Регистрация найдена' : '👤 Пользователь найден'}
                 </h3>
-                <div className="bg-gray-50 dark:bg-dark-700 rounded-lg p-4">
-                  <p className="font-medium text-lg">{scannedUser.userName}</p>
-                  <p className="text-gray-500 dark:text-gray-400">{scannedUser.userEmail}</p>
+                <div className="bg-gray-50 dark:bg-dark-700 rounded-lg p-3">
+                  <p className="font-medium">{scannedUser.userName}</p>
+                  <p className="text-sm text-gray-500">{scannedUser.userEmail}</p>
                   
-                  {/* Registration Details */}
                   {scannedUser.registrationData && (
-                    <div className="mt-3 pt-3 border-t border-gray-200 dark:border-dark-600">
-                      <div className="text-sm space-y-1">
-                        <p className="font-medium text-primary-600 dark:text-primary-400">
-                          {scannedUser.registrationData.eventTitle}
-                        </p>
-                        <p>
-                          Билеты: {scannedUser.registrationData.adultTickets} взрослых
-                          {scannedUser.registrationData.childTickets > 0 && 
-                            `, ${scannedUser.registrationData.childTickets} детей`
-                          }
-                        </p>
-                        {scannedUser.registrationData.totalAmount > 0 && (
-                          <p>Сумма: {scannedUser.registrationData.totalAmount} ₽</p>
-                        )}
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          Статус оплаты: {scannedUser.registrationData.paymentStatus === 'paid' ? 'Оплачено' : 
-                                          scannedUser.registrationData.paymentStatus === 'pending' ? 'Ожидает оплаты' : 
-                                          'Бесплатно'}
-                        </p>
-                      </div>
+                    <div className="mt-2 pt-2 border-t border-gray-200 dark:border-dark-600 text-sm">
+                      <p className="font-medium text-primary-600">
+                        {scannedUser.registrationData.eventTitle}
+                      </p>
+                      <p className="text-xs">
+                        🎫 {scannedUser.registrationData.adultTickets} взрослых
+                        {scannedUser.registrationData.childTickets > 0 && 
+                          `, ${scannedUser.registrationData.childTickets} детей`
+                        }
+                      </p>
+                      {scannedUser.registrationData.totalAmount > 0 && (
+                        <p className="text-xs">💰 {scannedUser.registrationData.totalAmount} ₽</p>
+                      )}
                     </div>
                   )}
                   
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+                  <p className="text-xs text-gray-400 mt-2">
                     ID: {scannedUser.qrToken.slice(0, 8)}...
                   </p>
                 </div>
               </div>
 
-              {/* Additional Info Form */}
-              <div className="space-y-4">
+              {/* Quick Form */}
+              <div className="space-y-3">
                 <div>
-                  <label className="block text-sm font-medium mb-2 flex items-center gap-2">
-                    <MapPin className="h-4 w-4" />
-                    Местоположение (опционально)
+                  <label className="block text-sm font-medium mb-1">
+                    📍 Местоположение
                   </label>
                   <input
                     type="text"
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
-                    placeholder="Например: Главный зал, Коворкинг"
-                    className="w-full p-3 border border-gray-300 dark:border-dark-600 rounded-lg dark:bg-dark-800"
+                    placeholder="Главный зал, Коворкинг..."
+                    className="w-full p-2 border border-gray-300 dark:border-dark-600 rounded dark:bg-dark-800 text-sm"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-2 flex items-center gap-2">
-                    <MessageSquare className="h-4 w-4" />
-                    Заметки (опционально)
+                  <label className="block text-sm font-medium mb-1">
+                    📝 Заметки
                   </label>
                   <textarea
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Дополнительная информация о посещении"
-                    rows={3}
-                    className="w-full p-3 border border-gray-300 dark:border-dark-600 rounded-lg dark:bg-dark-800"
+                    placeholder="Дополнительная информация..."
+                    rows={2}
+                    className="w-full p-2 border border-gray-300 dark:border-dark-600 rounded dark:bg-dark-800 text-sm"
                   />
                 </div>
               </div>
 
               {/* Action Buttons */}
-              <div className="flex gap-3">
+              <div className="flex gap-2">
                 <button
                   onClick={() => setScannedUser(null)}
-                  className="flex-1 btn-outline"
+                  className="flex-1 btn-outline py-3"
                 >
-                  Отмена
+                  ❌ Отмена
                 </button>
                 <button
                   onClick={confirmAttendance}
                   disabled={loading}
-                  className="flex-1 btn-primary"
+                  className="flex-1 btn-primary py-3 font-medium"
                 >
-                  {loading ? 'Сохранение...' : 'Подтвердить посещение'}
+                  {loading ? '⏳ Сохранение...' : '✅ Подтвердить'}
                 </button>
               </div>
             </div>
