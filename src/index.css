@@ -65,9 +65,35 @@
     @apply sticky top-0 z-50 bg-white dark:bg-dark-900 shadow-sm transition-colors duration-200;
   }
   
-  .topbar .container {
-    @apply flex items-center justify-between py-4;
-  }
+.topbar .container {
+  @apply flex items-center justify-between py-2;
+}
+
+/* Варианты высоты топбара */
+.topbar.topbar-compact .container {
+  @apply flex items-center justify-between py-1;
+}
+
+.topbar.topbar-standard .container {
+  @apply flex items-center justify-between py-2;
+}
+
+.topbar.topbar-large .container {
+  @apply flex items-center justify-between py-4;
+}
+
+/* Мобильное меню с учетом высоты топбара */
+.mobile-menu.mobile-menu-compact {
+  @apply top-12;
+}
+
+.mobile-menu.mobile-menu-standard {
+  @apply top-14;
+}
+
+.mobile-menu.mobile-menu-large {
+  @apply top-20;
+}
   
   .main-header, .page-header {
     @apply relative flex items-center bg-gradient-to-r from-primary-600 to-secondary-600 text-white h-hero;
