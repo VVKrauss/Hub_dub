@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import { 
   GripVertical, Eye, EyeOff, Save, Settings, Palette, 
-  Layout, Smartphone, Monitor, RotateCcw, ChevronUp, 
-  ChevronDown, Plus, Trash2, Edit3, Loader2
+  Layout, Smartphone, Monitor, RotateCcw, Plus, Trash2, Edit3, Loader2
 } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 import { toast } from 'react-hot-toast';
@@ -46,7 +45,7 @@ type FooterSettings = {
   workingHours: string;
   socialLinks: {
     telegram: string;
-    vk: string;
+    instagram: string;
     youtube: string;
   };
 };
@@ -60,7 +59,7 @@ const AdminNavigation = () => {
     workingHours: '',
     socialLinks: {
       telegram: '',
-      vk: '',
+      instagram: '',
       youtube: ''
     }
   });
@@ -68,7 +67,7 @@ const AdminNavigation = () => {
   // Настройки топбара
   const [topBarSettings, setTopBarSettings] = useState<TopBarSettings>({
     alignment: 'center',
-    style: 'modern',
+    style: 'classic',
     spacing: 'normal',
     showBorder: true,
     showShadow: true,
@@ -102,9 +101,13 @@ const AdminNavigation = () => {
         .limit(1)
         .single();
 
-      if (error && error.code !== 'PGRST116') throw error;
+      if (error && error.code !== 'PGRST116') {
+        console.error('Fetch error:', error);
+        throw error;
+      }
 
       if (data) {
+        console.log('Loaded settings:', data);
         setSiteSettingsId(data.id);
         
         // Обрабатываем навигационные элементы с порядком
@@ -114,26 +117,40 @@ const AdminNavigation = () => {
         })).sort((a: any, b: any) => a.order - b.order);
         
         setNavItems(navItemsWithOrder);
-        setFooterSettings(data.footer_settings || footerSettings);
-        setTopBarSettings({ ...topBarSettings, ...(data.topbar_settings || {}) });
+        setFooterSettings({
+          ...footerSettings,
+          ...(data.footer_settings || {})
+        });
+        setTopBarSettings({ 
+          ...topBarSettings, 
+          ...(data.topbar_settings || {}) 
+        });
       } else {
         // Создаем новую запись если её нет
+        console.log('Creating new settings record');
+        const newSettingsData = {
+          navigation_items: [],
+          footer_settings: footerSettings,
+          topbar_settings: topBarSettings
+        };
+
         const { data: newSettings, error: newError } = await supabase
           .from('site_settings')
-          .insert([{
-            navigation_items: [],
-            footer_settings: footerSettings,
-            topbar_settings: topBarSettings
-          }])
-          .select('id')
+          .insert([newSettingsData])
+          .select('*')
           .single();
 
-        if (newError) throw newError;
+        if (newError) {
+          console.error('Insert error:', newError);
+          throw newError;
+        }
+        
+        console.log('Created new settings:', newSettings);
         setSiteSettingsId(newSettings.id);
       }
     } catch (error) {
       console.error('Error fetching settings:', error);
-      toast.error('Ошибка при загрузке настроек');
+      toast.error('Ошибка при загрузке настроек: ' + (error as any).message);
     } finally {
       setLoading(false);
     }
@@ -199,7 +216,7 @@ const AdminNavigation = () => {
   const resetTopBarToDefaults = () => {
     const defaultSettings: TopBarSettings = {
       alignment: 'center',
-      style: 'modern',
+      style: 'classic',
       spacing: 'normal',
       showBorder: true,
       showShadow: true,
@@ -218,27 +235,37 @@ const AdminNavigation = () => {
   const handleSave = async () => {
     try {
       if (!siteSettingsId) {
-        toast.error('Site settings ID is not available.');
+        toast.error('ID настроек не найден');
         return;
       }
 
       setSaving(true);
+      console.log('Saving settings...', {
+        navigation_items: navItems,
+        footer_settings: footerSettings,
+        topbar_settings: topBarSettings
+      });
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('site_settings')
         .update({
           navigation_items: navItems,
           footer_settings: footerSettings,
           topbar_settings: topBarSettings
         })
-        .eq('id', siteSettingsId);
+        .eq('id', siteSettingsId)
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Save error:', error);
+        throw error;
+      }
 
+      console.log('Settings saved successfully:', data);
       toast.success('Настройки сохранены');
     } catch (error) {
       console.error('Error saving settings:', error);
-      toast.error('Ошибка при сохранении настроек');
+      toast.error('Ошибка при сохранении: ' + (error as any).message);
     } finally {
       setSaving(false);
     }
@@ -249,7 +276,7 @@ const AdminNavigation = () => {
       <div className="flex justify-center items-center h-64">
         <div className="flex items-center gap-3">
           <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
-          <span className="text-lg text-gray-600 dark:text-gray-300">Загрузка настроек...</span>
+          <span className="text-lg text-gray-900 dark:text-white">Загрузка настроек...</span>
         </div>
       </div>
     );
@@ -261,7 +288,7 @@ const AdminNavigation = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">Управление навигацией</h2>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">Настройка меню, топбара и футера сайта</p>
+          <p className="text-gray-600 dark:text-gray-300 mt-1">Настройка меню, топбара и футера сайта</p>
         </div>
         <button 
           onClick={handleSave}
@@ -283,12 +310,12 @@ const AdminNavigation = () => {
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200 dark:border-gray-700">
+      <div className="border-b border-gray-200 dark:border-gray-600">
         <nav className="flex space-x-8">
           {[
-            { id: 'navigation', label: 'Навигация', icon: Layout, desc: 'Управление меню' },
-            { id: 'topbar', label: 'Топбар', icon: Settings, desc: 'Настройки внешнего вида' },
-            { id: 'footer', label: 'Футер', icon: Monitor, desc: 'Контактная информация' }
+            { id: 'navigation', label: 'Навигация', icon: Layout },
+            { id: 'topbar', label: 'Топбар', icon: Settings },
+            { id: 'footer', label: 'Футер', icon: Monitor }
           ].map(tab => {
             const Icon = tab.icon;
             return (
@@ -298,9 +325,8 @@ const AdminNavigation = () => {
                 className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                   activeTab === tab.id
                     ? 'border-primary-500 text-primary-600 dark:text-primary-400'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                 }`}
-                title={tab.desc}
               >
                 <Icon className="h-4 w-4" />
                 {tab.label}
@@ -312,12 +338,12 @@ const AdminNavigation = () => {
 
       {/* Navigation Tab */}
       {activeTab === 'navigation' && (
-        <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+        <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-600">
           <div className="p-6">
             <div className="flex justify-between items-center mb-6">
               <div>
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white">Основное меню</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Перетаскивайте элементы для изменения порядка</p>
+                <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">Перетаскивайте элементы для изменения порядка</p>
               </div>
               <button
                 onClick={() => setShowAddForm(!showAddForm)}
@@ -330,7 +356,7 @@ const AdminNavigation = () => {
 
             {/* Add Form */}
             {showAddForm && (
-              <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+              <div className="mb-6 p-4 bg-gray-50 dark:bg-dark-700 rounded-lg border border-gray-200 dark:border-gray-600">
                 <h4 className="font-medium mb-3 text-gray-900 dark:text-white">Новый элемент навигации</h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
@@ -342,7 +368,7 @@ const AdminNavigation = () => {
                       placeholder="Например: Контакты"
                       value={newNavItem.label}
                       onChange={(e) => setNewNavItem(prev => ({ ...prev, label: e.target.value }))}
-                      className="form-input"
+                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-dark-800 text-gray-900 dark:text-white"
                     />
                   </div>
                   <div>
@@ -354,7 +380,7 @@ const AdminNavigation = () => {
                       placeholder="Например: /contacts"
                       value={newNavItem.path}
                       onChange={(e) => setNewNavItem(prev => ({ ...prev, path: e.target.value }))}
-                      className="form-input"
+                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-dark-800 text-gray-900 dark:text-white"
                     />
                   </div>
                   <div>
@@ -366,7 +392,7 @@ const AdminNavigation = () => {
                       placeholder="5"
                       value={newNavItem.badge}
                       onChange={(e) => setNewNavItem(prev => ({ ...prev, badge: e.target.value }))}
-                      className="form-input"
+                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-dark-800 text-gray-900 dark:text-white"
                     />
                   </div>
                 </div>
@@ -413,7 +439,7 @@ const AdminNavigation = () => {
                             >
                               <div className="flex items-center gap-3 flex-1">
                                 <span {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing">
-                                  <GripVertical className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                                  <GripVertical className="h-5 w-5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" />
                                 </span>
                                 
                                 <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -423,21 +449,21 @@ const AdminNavigation = () => {
                                         type="text"
                                         value={item.label}
                                         onChange={(e) => handleNavItemEdit(item.id, 'label', e.target.value)}
-                                        className="form-input text-sm"
+                                        className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-dark-800 text-gray-900 dark:text-white text-sm"
                                         placeholder="Название"
                                       />
                                       <input
                                         type="text"
                                         value={item.path}
                                         onChange={(e) => handleNavItemEdit(item.id, 'path', e.target.value)}
-                                        className="form-input text-sm"
+                                        className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-dark-800 text-gray-900 dark:text-white text-sm"
                                         placeholder="Путь"
                                       />
                                       <input
                                         type="number"
                                         value={item.badge || ''}
                                         onChange={(e) => handleNavItemEdit(item.id, 'badge', e.target.value ? parseInt(e.target.value) : undefined)}
-                                        className="form-input text-sm"
+                                        className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-dark-800 text-gray-900 dark:text-white text-sm"
                                         placeholder="Бейдж"
                                       />
                                     </>
@@ -454,7 +480,7 @@ const AdminNavigation = () => {
                                       <span className="text-sm text-gray-500 dark:text-gray-400 font-mono">{item.path}</span>
                                       <div className="flex items-center gap-2">
                                         {item.badge && (
-                                          <span className="text-xs bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 px-2 py-1 rounded-full">
+                                          <span className="text-xs bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-200 px-2 py-1 rounded-full">
                                             Бейдж: {item.badge}
                                           </span>
                                         )}
@@ -469,7 +495,7 @@ const AdminNavigation = () => {
                                 {editingNavItem === item.id ? (
                                   <button
                                     onClick={() => setEditingNavItem(null)}
-                                    className="p-2 text-green-600 hover:bg-green-100 dark:hover:bg-green-900/20 rounded-md transition-colors"
+                                    className="p-2 text-primary-600 hover:bg-primary-100 dark:hover:bg-primary-900/20 rounded-md transition-colors"
                                     title="Сохранить изменения"
                                   >
                                     <Save className="h-4 w-4" />
@@ -477,7 +503,7 @@ const AdminNavigation = () => {
                                 ) : (
                                   <button
                                     onClick={() => setEditingNavItem(item.id)}
-                                    className="p-2 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/20 rounded-md transition-colors"
+                                    className="p-2 text-primary-600 hover:bg-primary-100 dark:hover:bg-primary-900/20 rounded-md transition-colors"
                                     title="Редактировать"
                                   >
                                     <Edit3 className="h-4 w-4" />
@@ -488,7 +514,7 @@ const AdminNavigation = () => {
                                   onClick={() => toggleVisibility(item.id)}
                                   className={`p-2 rounded-md transition-colors ${
                                     item.visible
-                                      ? 'text-green-600 hover:bg-green-100 dark:hover:bg-green-900/20'
+                                      ? 'text-primary-600 hover:bg-primary-100 dark:hover:bg-primary-900/20'
                                       : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-600'
                                   }`}
                                   title={item.visible ? 'Скрыть элемент' : 'Показать элемент'}
@@ -498,7 +524,7 @@ const AdminNavigation = () => {
 
                                 <button
                                   onClick={() => handleDeleteNavItem(item.id)}
-                                  className="p-2 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/20 rounded-md transition-colors"
+                                  className="p-2 text-primary-600 hover:bg-primary-100 dark:hover:bg-primary-900/20 rounded-md transition-colors"
                                   title="Удалить элемент"
                                 >
                                   <Trash2 className="h-4 w-4" />
@@ -520,12 +546,12 @@ const AdminNavigation = () => {
 
       {/* TopBar Settings Tab */}
       {activeTab === 'topbar' && (
-        <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+        <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-600">
           <div className="p-6">
             <div className="flex justify-between items-center mb-6">
               <div>
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white">Настройки топбара</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Настройте внешний вид и поведение верхней панели</p>
+                <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">Настройте внешний вид и поведение верхней панели</p>
               </div>
               <button
                 onClick={resetTopBarToDefaults}
@@ -553,7 +579,7 @@ const AdminNavigation = () => {
                         ...prev,
                         alignment: e.target.value as any
                       }))}
-                      className="form-input"
+                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-dark-800 text-gray-900 dark:text-white"
                     >
                       <option value="left">Слева</option>
                       <option value="center">По центру</option>
@@ -570,9 +596,9 @@ const AdminNavigation = () => {
                         ...prev,
                         style: e.target.value as any
                       }))}
-                      className="form-input"
+                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-dark-800 text-gray-900 dark:text-white"
                     >
-                      <option value="classic">Классический</option>
+                      <option value="classic">Классический (линия снизу)</option>
                       <option value="modern">Современный</option>
                       <option value="minimal">Минимальный</option>
                       <option value="rounded">Скругленный</option>
@@ -587,7 +613,7 @@ const AdminNavigation = () => {
                         ...prev,
                         spacing: e.target.value as any
                       }))}
-                      className="form-input"
+                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-dark-800 text-gray-900 dark:text-white"
                     >
                       <option value="compact">Компактные</option>
                       <option value="normal">Обычные</option>
@@ -603,7 +629,7 @@ const AdminNavigation = () => {
                         ...prev,
                         maxWidth: e.target.value as any
                       }))}
-                      className="form-input"
+                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-dark-800 text-gray-900 dark:text-white"
                     >
                       <option value="container">Контейнер (1280px)</option>
                       <option value="screen-xl">Большой экран (1536px)</option>
@@ -629,7 +655,7 @@ const AdminNavigation = () => {
                         ...prev,
                         backgroundColor: e.target.value as any
                       }))}
-                      className="form-input"
+                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-dark-800 text-gray-900 dark:text-white"
                     >
                       <option value="white">Белый</option>
                       <option value="transparent">Прозрачный</option>
@@ -645,7 +671,7 @@ const AdminNavigation = () => {
                         ...prev,
                         animation: e.target.value as any
                       }))}
-                      className="form-input"
+                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-dark-800 text-gray-900 dark:text-white"
                     >
                       <option value="none">Без анимации</option>
                       <option value="slide">Слайд</option>
@@ -685,17 +711,16 @@ const AdminNavigation = () => {
             </div>
 
             {/* Preview */}
-            <div className="mt-8 p-6 bg-gray-50 dark:bg-gray-700 rounded-lg">
+            <div className="mt-8 p-6 bg-gray-50 dark:bg-dark-700 rounded-lg">
               <h4 className="font-medium mb-4 text-gray-900 dark:text-white">Предварительный просмотр</h4>
               <div className={`
-                border rounded-lg bg-white dark:bg-dark-800 p-4 transition-all
+                border rounded-lg bg-white dark:bg-dark-800 transition-all
                 ${topBarSettings.showBorder ? 'border-gray-200 dark:border-gray-600' : 'border-transparent'}
                 ${topBarSettings.showShadow ? 'shadow-lg' : ''}
                 ${topBarSettings.backgroundColor === 'blur' ? 'backdrop-blur-sm bg-white/80 dark:bg-dark-800/80' : ''}
                 ${topBarSettings.backgroundColor === 'transparent' ? 'bg-transparent' : ''}
               `}>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="text-sm font-medium text-gray-600 dark:text-gray-400">ScienceHub</div>
+                <div className="flex items-center justify-between p-4">
                   <div className="text-sm font-medium text-gray-600 dark:text-gray-400">ScienceHub</div>
                   <div className="flex items-center gap-2 text-xs text-gray-500">
                     <span>Войти</span>
@@ -703,7 +728,7 @@ const AdminNavigation = () => {
                   </div>
                 </div>
                 <div className={`
-                  flex items-center gap-2
+                  flex items-center p-4
                   ${topBarSettings.alignment === 'left' ? 'justify-start' : ''}
                   ${topBarSettings.alignment === 'center' ? 'justify-center' : ''}
                   ${topBarSettings.alignment === 'right' ? 'justify-end' : ''}
@@ -712,24 +737,25 @@ const AdminNavigation = () => {
                   ${topBarSettings.spacing === 'normal' ? 'gap-4' : ''}
                   ${topBarSettings.spacing === 'relaxed' ? 'gap-6' : ''}
                 `}>
-                  {navItems.filter(item => item.visible).slice(0, 4).map(item => (
+                  {navItems.filter(item => item.visible).slice(0, 4).map((item, index) => (
                     <div
                       key={item.id}
                       className={`
-                        px-3 py-2 text-sm font-medium cursor-pointer transition-all duration-300
+                        px-3 py-2 text-sm font-medium cursor-pointer transition-all duration-300 relative
                         ${topBarSettings.style === 'classic' ? 'hover:text-primary-600 border-b-2 border-transparent hover:border-primary-600' : ''}
-                        ${topBarSettings.style === 'modern' ? 'hover:bg-primary-50 rounded-lg' : ''}
+                        ${topBarSettings.style === 'modern' ? 'hover:bg-primary-100 dark:hover:bg-primary-900/20 rounded-lg' : ''}
                         ${topBarSettings.style === 'minimal' ? 'hover:opacity-80' : ''}
-                        ${topBarSettings.style === 'rounded' ? 'hover:bg-gray-100 rounded-full' : ''}
+                        ${topBarSettings.style === 'rounded' ? 'hover:bg-primary-100 dark:hover:bg-primary-900/20 rounded-full' : ''}
                         ${topBarSettings.animation === 'slide' ? 'hover:transform hover:-translate-y-0.5' : ''}
                         ${topBarSettings.animation === 'fade' ? 'hover:opacity-70' : ''}
                         ${topBarSettings.animation === 'bounce' ? 'hover:animate-pulse' : ''}
+                        ${index === 0 && topBarSettings.style === 'classic' ? 'text-primary-600 border-b-2 border-primary-600' : ''}
                       `}
                     >
                       <div className="flex items-center gap-2">
                         {item.label}
                         {topBarSettings.showBadges && item.badge && (
-                          <span className="bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] h-4 flex items-center justify-center">
+                          <span className="bg-primary-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] h-4 flex items-center justify-center">
                             {item.badge}
                           </span>
                         )}
@@ -739,7 +765,7 @@ const AdminNavigation = () => {
                 </div>
               </div>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                Это примерный вид топбара с текущими настройками
+                Это примерный вид топбара с текущими настройками. Первый элемент показан как активный.
               </p>
             </div>
           </div>
@@ -748,11 +774,11 @@ const AdminNavigation = () => {
 
       {/* Footer Tab */}
       {activeTab === 'footer' && (
-        <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+        <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-600">
           <div className="p-6">
             <div className="mb-6">
               <h3 className="text-lg font-medium text-gray-900 dark:text-white">Настройки футера</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Контактная информация и социальные сети</p>
+              <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">Контактная информация и социальные сети</p>
             </div>
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -764,7 +790,7 @@ const AdminNavigation = () => {
                 </h4>
                 
                 <div className="space-y-4">
-                  <div className="form-group">
+                  <div>
                     <label className="block font-medium mb-2 text-gray-700 dark:text-gray-300">Email</label>
                     <input
                       type="email"
@@ -773,12 +799,12 @@ const AdminNavigation = () => {
                         ...prev,
                         email: e.target.value
                       }))}
-                      placeholder="info@sciencehub.site"
-                      className="form-input"
+                      placeholder="sciencehubrs@gmail.com"
+                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-dark-800 text-gray-900 dark:text-white"
                     />
                   </div>
                   
-                  <div className="form-group">
+                  <div>
                     <label className="block font-medium mb-2 text-gray-700 dark:text-gray-300">Телефон</label>
                     <input
                       type="tel"
@@ -788,11 +814,11 @@ const AdminNavigation = () => {
                         phone: e.target.value
                       }))}
                       placeholder="+381 629434798"
-                      className="form-input"
+                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-dark-800 text-gray-900 dark:text-white"
                     />
                   </div>
                   
-                  <div className="form-group">
+                  <div>
                     <label className="block font-medium mb-2 text-gray-700 dark:text-gray-300">Адрес</label>
                     <input
                       type="text"
@@ -802,11 +828,11 @@ const AdminNavigation = () => {
                         address: e.target.value
                       }))}
                       placeholder="Sarajevska 48, Belgrade"
-                      className="form-input"
+                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-dark-800 text-gray-900 dark:text-white"
                     />
                   </div>
                   
-                  <div className="form-group">
+                  <div>
                     <label className="block font-medium mb-2 text-gray-700 dark:text-gray-300">Часы работы</label>
                     <input
                       type="text"
@@ -816,7 +842,7 @@ const AdminNavigation = () => {
                         workingHours: e.target.value
                       }))}
                       placeholder="Пн-Пт: 9:00-22:00, Сб-Вс: 10:00-20:00"
-                      className="form-input"
+                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-dark-800 text-gray-900 dark:text-white"
                     />
                   </div>
                 </div>
@@ -830,7 +856,7 @@ const AdminNavigation = () => {
                 </h4>
                 
                 <div className="space-y-4">
-                  <div className="form-group">
+                  <div>
                     <label className="block font-medium mb-2 text-gray-700 dark:text-gray-300">Telegram</label>
                     <input
                       type="url"
@@ -843,28 +869,28 @@ const AdminNavigation = () => {
                           telegram: e.target.value
                         }
                       }))}
-                      className="form-input"
+                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-dark-800 text-gray-900 dark:text-white"
                     />
                   </div>
                   
-                  <div className="form-group">
-                    <label className="block font-medium mb-2 text-gray-700 dark:text-gray-300">VKontakte</label>
+                  <div>
+                    <label className="block font-medium mb-2 text-gray-700 dark:text-gray-300">Instagram</label>
                     <input
                       type="url"
-                      placeholder="https://vk.com/sciencehub"
-                      value={footerSettings.socialLinks.vk}
+                      placeholder="https://instagram.com/sciencehub"
+                      value={footerSettings.socialLinks.instagram}
                       onChange={(e) => setFooterSettings(prev => ({
                         ...prev,
                         socialLinks: {
                           ...prev.socialLinks,
-                          vk: e.target.value
+                          instagram: e.target.value
                         }
                       }))}
-                      className="form-input"
+                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-dark-800 text-gray-900 dark:text-white"
                     />
                   </div>
                   
-                  <div className="form-group">
+                  <div>
                     <label className="block font-medium mb-2 text-gray-700 dark:text-gray-300">YouTube</label>
                     <input
                       type="url"
@@ -877,20 +903,20 @@ const AdminNavigation = () => {
                           youtube: e.target.value
                         }
                       }))}
-                      className="form-input"
+                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-dark-800 text-gray-900 dark:text-white"
                     />
                   </div>
                 </div>
 
                 {/* Preview Links */}
-                <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <div className="mt-6 p-4 bg-gray-50 dark:bg-dark-700 rounded-lg">
                   <h5 className="font-medium mb-3 text-gray-900 dark:text-white">Предварительный просмотр ссылок</h5>
                   <div className="flex flex-wrap gap-2">
                     {Object.entries(footerSettings.socialLinks).map(([platform, url]) => {
                       if (!url) return null;
                       const platformNames = {
                         telegram: 'Telegram',
-                        vk: 'VKontakte', 
+                        instagram: 'Instagram', 
                         youtube: 'YouTube'
                       };
                       return (
@@ -915,9 +941,9 @@ const AdminNavigation = () => {
             </div>
 
             {/* Footer Preview */}
-            <div className="mt-8 p-6 bg-gray-50 dark:bg-gray-700 rounded-lg">
+            <div className="mt-8 p-6 bg-gray-50 dark:bg-dark-700 rounded-lg">
               <h4 className="font-medium mb-4 text-gray-900 dark:text-white">Предварительный просмотр футера</h4>
-              <div className="bg-gray-900 text-white p-6 rounded-lg">
+              <div className="bg-dark-900 text-white p-6 rounded-lg">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   {/* Контакты */}
                   <div>
@@ -968,11 +994,18 @@ const AdminNavigation = () => {
                     <div className="flex gap-3">
                       {Object.entries(footerSettings.socialLinks).map(([platform, url]) => {
                         if (!url) return null;
-                        const emojis = { telegram: '✈️', vk: '🌐', youtube: '📺' };
+                        const logos = {
+                          telegram: 'https://jfvinriqydjtwsmayxix.supabase.co/storage/v1/object/public/images/logos/telegram-logo-100x100.png',
+                          instagram: 'https://jfvinriqydjtwsmayxix.supabase.co/storage/v1/object/public/images/logos/instagram-logo-100x100.png',
+                          youtube: 'https://jfvinriqydjtwsmayxix.supabase.co/storage/v1/object/public/images/logos/youtube-logo-100x100.png'
+                        };
                         return (
-                          <span key={platform} className="text-2xl cursor-pointer hover:scale-110 transition-transform">
-                            {emojis[platform as keyof typeof emojis]}
-                          </span>
+                          <img 
+                            key={platform}
+                            src={logos[platform as keyof typeof logos]}
+                            alt={platform}
+                            className="w-8 h-8 cursor-pointer hover:scale-110 transition-transform"
+                          />
                         );
                       })}
                     </div>
