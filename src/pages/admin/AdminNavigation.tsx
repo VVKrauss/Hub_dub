@@ -987,4 +987,4 @@ const AdminNavigation = () => {
   );
 };
 
-export default AdminNavigation; 
+export default AdminNavigation;
