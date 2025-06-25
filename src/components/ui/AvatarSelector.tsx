@@ -2,7 +2,7 @@
 // Упрощенная версия без лишнего функционала
 
 import { useState, useEffect } from 'react';
-import { Check, X, Shuffle, Search, ChevronLeft, ChevronRight, RefreshCw, AlertCircle } from 'lucide-react';
+import { Check, X, Shuffle, ChevronLeft, ChevronRight, RefreshCw, AlertCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { getCachedAvatars, invalidateAvatarCache } from '../../utils/dynamicAvatarUtils';
 
@@ -21,7 +21,6 @@ type AvatarFile = {
 const AvatarSelector = ({ currentAvatar, onAvatarSelect, onClose }: AvatarSelectorProps) => {
   const [selectedAvatar, setSelectedAvatar] = useState<string>(currentAvatar || '');
   const [loading, setLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   
   // Состояние для аватаров
@@ -61,28 +60,11 @@ const AvatarSelector = ({ currentAvatar, onAvatarSelect, onClose }: AvatarSelect
     toast.success('Список аватаров обновлен');
   };
 
-  // Фильтрация только по поиску
-  const filteredAvatars = availableAvatars.filter(avatar => {
-    if (!searchQuery) return true;
-    
-    const fileName = avatar.name.toLowerCase();
-    const fileNameWithoutExt = fileName.replace(/\.(png|jpg|jpeg|gif|webp)$/i, '');
-    const query = searchQuery.toLowerCase();
-    
-    return fileName.includes(query) || 
-           fileNameWithoutExt.includes(query) ||
-           (/\d+/.test(query) && fileName.includes(query));
-  });
-
-  const totalPages = Math.ceil(filteredAvatars.length / itemsPerPage);
+  // Простая пагинация без фильтрации
+  const totalPages = Math.ceil(availableAvatars.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const currentAvatars = filteredAvatars.slice(startIndex, endIndex);
-
-  // Reset page when search changes
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery]);
+  const currentAvatars = availableAvatars.slice(startIndex, endIndex);
 
   const getRandomAvatar = () => {
     if (availableAvatars.length === 0) {
@@ -180,7 +162,7 @@ const AvatarSelector = ({ currentAvatar, onAvatarSelect, onClose }: AvatarSelect
                     {avatarsError}
                   </span>
                 ) : (
-                  `${filteredAvatars.length} из ${availableAvatars.length} аватаров`
+                  `${availableAvatars.length} аватаров`
                 )}
               </p>
             </div>
@@ -208,7 +190,7 @@ const AvatarSelector = ({ currentAvatar, onAvatarSelect, onClose }: AvatarSelect
           {selectedAvatar && (
             <div className="text-center mb-6">
               <div className="inline-block relative">
-                <div className="w-32 h-32 rounded-xl overflow-hidden border-4 border-primary-500 shadow-lg mb-3">
+                <div className="w-50 h-50 rounded-xl overflow-hidden border-4 border-primary-500 shadow-lg mb-3" style={{width: '200px', height: '200px'}}>
                   <img
                     src={selectedAvatar}
                     alt="Выбранный аватар"
@@ -222,28 +204,15 @@ const AvatarSelector = ({ currentAvatar, onAvatarSelect, onClose }: AvatarSelect
             </div>
           )}
 
-          {/* Search and Random */}
-          <div className="flex gap-4 items-center">
-            {/* Search */}
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Поиск по имени или номеру..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800"
-              />
-            </div>
-
-            {/* Random Avatar */}
+          {/* Random Avatar Button */}
+          <div className="flex justify-center">
             <button
               onClick={getRandomAvatar}
               disabled={availableAvatars.length === 0}
-              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-dark-700 dark:hover:bg-dark-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-dark-700 dark:hover:bg-dark-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Shuffle className="h-4 w-4" />
-              Случайный
+              Случайный аватар
             </button>
           </div>
         </div>
@@ -287,13 +256,10 @@ const AvatarSelector = ({ currentAvatar, onAvatarSelect, onClose }: AvatarSelect
               </>
             ) : (
               <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-                <Search className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                <AlertCircle className="h-16 w-16 mx-auto mb-4 opacity-50" />
                 <h3 className="text-lg font-medium mb-2">Аватары не найдены</h3>
                 <p className="text-sm">
-                  {searchQuery 
-                    ? 'Попробуйте изменить поисковый запрос'
-                    : 'Аватары не загружены или произошла ошибка'
-                  }
+                  Аватары не загружены или произошла ошибка
                 </p>
                 {avatarsError && (
                   <button
