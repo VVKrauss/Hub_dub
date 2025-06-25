@@ -11,6 +11,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useFavoriteSpeakers, useFavoriteEvents } from '../hooks/useFavorites';
 import { getSupabaseImageUrl } from '../utils/imageUtils';
 import AvatarSelector from '../components/ui/AvatarSelector';
+
 import UserRegistrationHistory from '../components/profile/UserRegistrationHistory';
 import { getRandomAvatarUrl } from '../utils/dynamicAvatarUtils';
 
@@ -503,6 +504,36 @@ const ProfilePage = () => {
             </div>
           </div>
 
+<div className="space-y-6">
+  {/* Existing QR Code section */}
+  {profile && (
+    <UserQRCode 
+      userId={profile.id}
+      userName={profile.name || profile.email?.split('@')[0] || 'Пользователь'}
+      userEmail={profile.email}
+    />
+  )}
+  
+  {/* Registration History section */}
+  {profile && (
+    <UserRegistrationHistory userId={profile.id} />
+  )}
+</div><div className="space-y-6">
+  {/* Existing QR Code section */}
+  {profile && (
+    <UserQRCode 
+      userId={profile.id}
+      userName={profile.name || profile.email?.split('@')[0] || 'Пользователь'}
+      userEmail={profile.email}
+    />
+  )}
+  
+  {/* Registration History section */}
+  {profile && (
+    <UserRegistrationHistory userId={profile.id} />
+  )}
+</div>
+          
           {/* История регистраций */}
           <div className="bg-white dark:bg-dark-800 rounded-lg shadow-md overflow-hidden">
             <div className="p-6 border-b border-gray-200 dark:border-dark-700">
