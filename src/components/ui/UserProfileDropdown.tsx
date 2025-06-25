@@ -44,9 +44,7 @@ const UserProfileDropdown = ({ user, onLogout }: UserProfileDropdownProps) => {
           name={user.name || user.email}
           size="sm"
         />
-        <span className="text-sm font-medium hidden md:block max-w-32 truncate">
-          {user.name || user.email?.split('@')[0]}
-        </span>
+        {/* Убираем отображение имени */}
         <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
