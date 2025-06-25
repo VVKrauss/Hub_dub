@@ -1,5 +1,5 @@
 // src/contexts/AuthContext.tsx
-// Обновленная версия с поддержкой профиля пользователя
+// Упрощенная версия для исправления зависания
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
@@ -36,8 +36,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User>(null);
   const [loading, setLoading] = useState(true);
 
-  // Загрузка профиля пользователя
-  const fetchUserProfile = async (userId: string) => {
+  // Загрузка профиля пользователя (неблокирующая)
+  const fetchUserProfile = async (userId: string): Promise<UserProfile | null> => {
     try {
       const { data: profileData, error } = await supabase
         .from('profiles')
@@ -57,21 +57,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // Обновление пользователя с профилем
+  // Обновление пользователя с профилем (асинхронно в фоне)
   const updateUserWithProfile = async (authUser: any) => {
     if (!authUser) {
       setUser(null);
       return;
     }
 
-    const profile = await fetchUserProfile(authUser.id);
-    
-    setUser({
+    // Сначала устанавливаем базовые данные пользователя
+    const baseUser: User = {
       id: authUser.id,
       email: authUser.email || '',
-      name: authUser.user_metadata?.name || profile?.name,
-      profile: profile || undefined
-    });
+      name: authUser.user_metadata?.name,
+      profile: undefined
+    };
+    
+    setUser(baseUser);
+
+    // Затем загружаем профиль в фоне
+    try {
+      const profile = await fetchUserProfile(authUser.id);
+      if (profile) {
+        setUser(prev => prev ? { ...prev, profile } : null);
+      }
+    } catch (error) {
+      console.error('Error loading profile in background:', error);
+      // Не критично - пользователь уже авторизован
+    }
   };
 
   // Обновление профиля в локальном состоянии
@@ -90,9 +102,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const refreshProfile = async () => {
     if (!user?.id) return;
     
-    const profile = await fetchUserProfile(user.id);
-    if (profile) {
-      updateProfile(profile);
+    try {
+      const profile = await fetchUserProfile(user.id);
+      if (profile) {
+        updateProfile(profile);
+      }
+    } catch (error) {
+      console.error('Error refreshing profile:', error);
     }
   };
 
@@ -102,7 +118,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
-          await updateUserWithProfile(session.user);
+          // Неблокирующее обновление с профилем
+          updateUserWithProfile(session.user);
         } else {
           setUser(null);
         }
@@ -119,6 +136,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Set up auth state listener
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
+        // Неблокирующее обновление с профилем
         await updateUserWithProfile(session.user);
       } else {
         setUser(null);
