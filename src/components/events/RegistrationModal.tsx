@@ -24,7 +24,7 @@ type RegistrationModalProps = {
     widget_chooser?: boolean;
     couple_discount?: number;
     child_half_price?: boolean;
-    adults_only?: boolean;
+    age_category: string; // Используем возрастную категорию вместо adults_only
     registrations?: EventRegistrations;
   };
 };
