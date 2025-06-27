@@ -1,11 +1,11 @@
-// src/pages/admin/CreateEditEventPage.tsx - Часть 1
+// src/pages/admin/CreateEditEventPage.tsx - Готовая часть 1
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { 
   Info, Calendar, MapPin, Users, Globe, Save, Loader2, 
   Upload, Image as ImageIcon, X, Trash2, AlertTriangle,
-  DollarSign, Tag, Play, Plus
+  DollarSign, Tag, Plus
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import EventSpeakersSection from '../../components/admin/EventSpeakersSection';
@@ -37,6 +37,7 @@ interface Speaker {
 interface CreateEventForm {
   id?: string;
   title: string;
+  short_description: string;
   description: string;
   event_type: string;
   bg_image: string;
@@ -45,13 +46,15 @@ interface CreateEventForm {
   location: string;
   age_category: string;
   price: string;
+  price_comment: string;
   currency: string;
   status: string;
   payment_type: string;
   payment_link: string;
-  oblakkarte_data_event_id: string; // Новое поле для ID события
-  widget_chooser: boolean; // true = виджет, false = ссылка
-  max_registrations: number; // Максимальное количество участников
+  oblakkarte_data_event_id: string;
+  widget_chooser: boolean;
+  max_registrations: number;
+  child_half_price: boolean;
   languages: string[];
   speakers: string[];
   festival_program: FestivalProgramItem[];
@@ -68,7 +71,15 @@ const eventTypes = [
   'training', 'course', 'festival', 'exhibition', 'discussion', 'other'
 ];
 
-const ageCategories = ['adult', 'children', 'family', 'all'];
+// Правильные возрастные категории
+const ageCategories = [
+  { value: '0+', label: '0+ (для всех)' },
+  { value: '6+', label: '6+ (от 6 лет)' },
+  { value: '12+', label: '12+ (от 12 лет)' },
+  { value: '16+', label: '16+ (от 16 лет)' },
+  { value: '18+', label: '18+ (только взрослые)' }
+];
+
 const paymentTypes = ['free', 'cost', 'donation'];
 const statuses = ['draft', 'active', 'past'];
 const availableLanguages = ['Русский', 'Английский', 'Сербский', 'Испанский', 'Французский'];
@@ -76,14 +87,16 @@ const availableLanguages = ['Русский', 'Английский', 'Серб�
 // Функция создания начального состояния
 const createInitialEventState = (): CreateEventForm => ({
   title: '',
+  short_description: '',
   description: '',
   event_type: 'lecture',
   bg_image: '',
   start_at: '',
   end_at: '',
   location: '',
-  age_category: 'adult',
+  age_category: '0+',
   price: '',
+  price_comment: '',
   currency: 'RUB',
   status: 'draft',
   payment_type: 'free',
@@ -91,6 +104,7 @@ const createInitialEventState = (): CreateEventForm => ({
   oblakkarte_data_event_id: '',
   widget_chooser: false,
   max_registrations: 40,
+  child_half_price: false,
   languages: [],
   speakers: [],
   festival_program: [],
@@ -127,7 +141,9 @@ const getImageUrl = (imagePath: string): string => {
     
   return data.publicUrl;
 };
-// src/pages/admin/CreateEditEventPage.tsx - Часть 2
+
+
+// src/pages/admin/CreateEditEventPage.tsx - Готовая часть 2
 const CreateEditEventPage = () => {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -171,9 +187,12 @@ const CreateEditEventPage = () => {
             setEvent({
               ...eventData,
               price: eventData.price?.toString() || '',
+              price_comment: eventData.price_comment || '',
               couple_discount: eventData.couple_discount?.toString() || '',
               start_at: eventData.start_at || '',
               end_at: eventData.end_at || '',
+              short_description: eventData.short_description || '',
+              child_half_price: eventData.child_half_price || false,
               languages: eventData.languages || [],
               speakers: eventData.speakers || [],
               festival_program: eventData.festival_program || [],
@@ -204,6 +223,7 @@ const CreateEditEventPage = () => {
     const { name, value } = e.target;
     
     if (name === 'title' && value.length > TITLE_MAX_LENGTH) return;
+    if (name === 'short_description' && value.length > SHORT_DESC_MAX_LENGTH) return;
     if (name === 'description' && value.length > DESC_MAX_LENGTH) return;
     
     setEvent(prev => ({
@@ -290,7 +310,16 @@ const CreateEditEventPage = () => {
     }));
   };
 
-  // src/pages/admin/CreateEditEventPage.tsx - Часть 3
+  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, checked } = e.target;
+    setEvent(prev => ({
+      ...prev,
+      [name]: checked
+    }));
+  };
+
+
+  // src/pages/admin/CreateEditEventPage.tsx - Готовая часть 3
 
   // Валидация формы
   const validateForm = (): boolean => {
@@ -301,6 +330,17 @@ const CreateEditEventPage = () => {
     if (!event.start_at) newErrors.start_at = true;
     if (!event.end_at) newErrors.end_at = true;
     if (!event.location.trim()) newErrors.location = true;
+
+    // Проверка времени
+    if (event.start_at && event.end_at) {
+      const startDate = new Date(event.start_at);
+      const endDate = new Date(event.end_at);
+      
+      if (endDate <= startDate) {
+        newErrors.end_at = true;
+        toast.error('Время окончания должно быть позже времени начала');
+      }
+    }
 
     // Валидация полей оплаты
     if (event.status === 'active') {
@@ -417,6 +457,7 @@ const CreateEditEventPage = () => {
       eventData.payment_link = null;
       eventData.oblakkarte_data_event_id = null;
       eventData.widget_chooser = false;
+      eventData.child_half_price = false;
     } else if (eventData.payment_type === 'cost') {
       if (!eventData.widget_chooser) {
         // Для ссылки очищаем ID события
@@ -424,6 +465,11 @@ const CreateEditEventPage = () => {
       } else {
         // Для виджета очищаем ссылку
         eventData.payment_link = null;
+      }
+      
+      // Для мероприятий 18+ убираем детскую скидку
+      if (eventData.age_category === '18+') {
+        eventData.child_half_price = false;
       }
     }
     
@@ -437,7 +483,7 @@ const CreateEditEventPage = () => {
     return eventData;
   };
 
-  // src/pages/admin/CreateEditEventPage.tsx - Часть 4 
+  // src/pages/admin/CreateEditEventPage.tsx - Готовая часть 4
 
   // Отправка формы
   const handleSubmit = async (e: React.FormEvent) => {
@@ -612,9 +658,8 @@ const CreateEditEventPage = () => {
           ))}
         </div>
       </div>
-      
-      
-      {/* // src/pages/admin/CreateEditEventPage.tsx - Часть 5 */}
+
+// src/pages/admin/CreateEditEventPage.tsx - Готовая часть 5
 
       {/* Основная форма */}
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -646,6 +691,25 @@ const CreateEditEventPage = () => {
               />
               <p className="text-gray-500 text-sm text-right mt-2">
                 {event.title.length}/{TITLE_MAX_LENGTH}
+              </p>
+            </div>
+            
+            {/* Краткое описание */}
+            <div className="form-group">
+              <label htmlFor="short_description" className="block font-medium mb-2 text-gray-700 dark:text-gray-300">
+                Краткое описание
+              </label>
+              <input
+                type="text"
+                id="short_description"
+                name="short_description"
+                value={event.short_description}
+                onChange={handleInputChange}
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-dark-600 bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800 transition-colors"
+                placeholder="Краткое описание для списка мероприятий"
+              />
+              <p className="text-gray-500 text-sm text-right mt-2">
+                {event.short_description.length}/{SHORT_DESC_MAX_LENGTH}
               </p>
             </div>
             
@@ -716,11 +780,8 @@ const CreateEditEventPage = () => {
                   className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-dark-600 bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800"
                 >
                   {ageCategories.map(category => (
-                    <option key={category} value={category}>
-                      {category === 'adult' ? 'Взрослые' :
-                       category === 'children' ? 'Дети' :
-                       category === 'family' ? 'Семейное' :
-                       'Для всех'}
+                    <option key={category.value} value={category.value}>
+                      {category.label}
                     </option>
                   ))}
                 </select>
@@ -810,7 +871,7 @@ const CreateEditEventPage = () => {
         </div>
 
 
-src/pages/admin/CreateEditEventPage.tsx - Часть 6 */
+        // src/pages/admin/CreateEditEventPage.tsx - Готовая часть 6
 
         {/* Обложка мероприятия */}
         <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-dark-600 p-6">
@@ -977,8 +1038,8 @@ src/pages/admin/CreateEditEventPage.tsx - Часть 6 */
             )}
           </div>
         </div>
-        
-        {/* // src/pages/admin/CreateEditEventPage.tsx - Часть 7 */}
+
+        // src/pages/admin/CreateEditEventPage.tsx - Готовая часть 7
 
         {/* Информация об оплате */}
         <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-dark-600 p-6">
@@ -1022,50 +1083,71 @@ src/pages/admin/CreateEditEventPage.tsx - Часть 6 */
             
             {/* Цена и валюта для платных мероприятий */}
             {event.payment_type === 'cost' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="form-group">
-                  <label htmlFor="price" className="block font-medium mb-2 text-gray-700 dark:text-gray-300">
-                    Цена
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      id="price"
-                      name="price"
-                      value={event.price || ''}
-                      onChange={handleInputChange}
-                      className={`w-full px-4 py-3 pr-16 rounded-lg border transition-colors ${
-                        errors.price 
-                          ? 'border-red-500 focus:border-red-500' 
-                          : 'border-gray-300 dark:border-dark-600 focus:border-primary-500'
-                      } bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800`}
-                      placeholder="0"
-                      min="0"
-                      step="100"
-                    />
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
-                      <span className="text-gray-500 font-medium">{event.currency}</span>
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="form-group">
+                    <label htmlFor="price" className="block font-medium mb-2 text-gray-700 dark:text-gray-300">
+                      Цена
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        id="price"
+                        name="price"
+                        value={event.price || ''}
+                        onChange={handleInputChange}
+                        className={`w-full px-4 py-3 pr-16 rounded-lg border transition-colors ${
+                          errors.price 
+                            ? 'border-red-500 focus:border-red-500' 
+                            : 'border-gray-300 dark:border-dark-600 focus:border-primary-500'
+                        } bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800`}
+                        placeholder="0"
+                        min="0"
+                        step="100"
+                      />
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                        <span className="text-gray-500 font-medium">{event.currency}</span>
+                      </div>
                     </div>
+                  </div>
+                  
+                  <div className="form-group">
+                    <label htmlFor="currency" className="block font-medium mb-2 text-gray-700 dark:text-gray-300">
+                      Валюта
+                    </label>
+                    <select
+                      id="currency"
+                      name="currency"
+                      value={event.currency}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-dark-600 bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800"
+                    >
+                      <option value="RUB">RUB (₽)</option>
+                      <option value="EUR">EUR (€)</option>
+                      <option value="USD">USD ($)</option>
+                    </select>
                   </div>
                 </div>
                 
+                {/* Комментарий к цене */}
                 <div className="form-group">
-                  <label htmlFor="currency" className="block font-medium mb-2 text-gray-700 dark:text-gray-300">
-                    Валюта
+                  <label htmlFor="price_comment" className="block font-medium mb-2 text-gray-700 dark:text-gray-300">
+                    Комментарий к цене
                   </label>
-                  <select
-                    id="currency"
-                    name="currency"
-                    value={event.currency}
+                  <input
+                    type="text"
+                    id="price_comment"
+                    name="price_comment"
+                    value={event.price_comment || ''}
                     onChange={handleInputChange}
                     className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-dark-600 bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800"
-                  >
-                    <option value="RUB">RUB (₽)</option>
-                    <option value="EUR">EUR (€)</option>
-                    <option value="USD">USD ($)</option>
-                  </select>
+                    placeholder="Например: включён кофе-брейк, материалы"
+                  />
+                  <p className="text-gray-500 text-sm mt-2">
+                    Дополнительная информация о том, что включено в стоимость
+                  </p>
                 </div>
-              </div>
+              </>
             )}
             
             {/* Настройки онлайн оплаты */}
@@ -1180,7 +1262,7 @@ src/pages/admin/CreateEditEventPage.tsx - Часть 6 */
             {event.payment_type === 'cost' && (
               <div className="form-group">
                 <label htmlFor="couple_discount" className="block font-medium mb-2 text-gray-700 dark:text-gray-300">
-                  Скидка для пар ({event.currency})
+                  Скидка для пар (%)
                 </label>
                 <input
                   type="number"
@@ -1191,14 +1273,49 @@ src/pages/admin/CreateEditEventPage.tsx - Часть 6 */
                   className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-dark-600 bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800"
                   placeholder="0"
                   min="0"
-                  step="50"
+                  max="100"
+                  step="5"
                 />
+                <p className="text-gray-500 text-sm mt-2">
+                  Процент скидки при покупке двух и более взрослых билетов
+                </p>
+              </div>
+            )}
+
+            {/* Настройки для детей - показываем только если мероприятие НЕ для взрослых */}
+            {event.payment_type === 'cost' && event.age_category !== '18+' && (
+              <div className="form-group">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="child_half_price"
+                    name="child_half_price"
+                    checked={event.child_half_price}
+                    onChange={handleCheckboxChange}
+                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="child_half_price" className="block font-medium text-gray-700 dark:text-gray-300">
+                    50% скидка для детей
+                  </label>
+                </div>
+                <p className="text-gray-500 text-sm mt-2 ml-7">
+                  Детские билеты будут стоить в два раза дешевле взрослых
+                </p>
+              </div>
+            )}
+
+            {/* Информация для мероприятий 18+ */}
+            {event.payment_type === 'cost' && event.age_category === '18+' && (
+              <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                <p className="text-sm text-amber-800 dark:text-amber-200">
+                  <strong>Только для взрослых:</strong> Для мероприятий с возрастной категорией 18+ детские билеты не предусмотрены
+                </p>
               </div>
             )}
           </div>
         </div>
 
-{/* // src/pages/admin/CreateEditEventPage.tsx - Часть 8 (Финальная часть) */}
+        // src/pages/admin/CreateEditEventPage.tsx - Готовая часть 8
 
         {/* Секция спикеров */}
         <EventSpeakersSection
@@ -1209,7 +1326,7 @@ src/pages/admin/CreateEditEventPage.tsx - Часть 6 */
           allSpeakers={speakers}
         />
         
-        {/* Секция программы фестиваля */}
+        {/* Секция программы фестиваля - показывается только для типа "festival" */}
         <EventFestivalProgramSection
           eventType={event.event_type}
           festivalProgram={event.festival_program}
@@ -1281,4 +1398,3 @@ src/pages/admin/CreateEditEventPage.tsx - Часть 6 */
 };
 
 export default CreateEditEventPage;
-        
