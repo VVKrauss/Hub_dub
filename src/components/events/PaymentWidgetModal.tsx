@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { X, Loader2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { X, Loader2, AlertCircle } from 'lucide-react';
 import Modal from '../ui/Modal';
 
 type PaymentWidgetModalProps = {

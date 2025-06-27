@@ -58,6 +58,9 @@ interface Event {
   registrations?: EventRegistrations;
   video_url?: string;
   photo_gallery?: string[] | string;
+  // Дополнительные поля для виджета Oblakkarte
+  widget_chooser?: boolean;
+  oblakkarte_data_event_id?: string;
   // Удаляем legacy поля полностью, так как они больше не используются
 }
 
@@ -198,7 +201,7 @@ const EventDetailsPage = () => {
 
       if (eventError) throw eventError;
 
-      // Обогащаем событие временными данными из слота
+      // Обогащаем событие временными данными
       const enrichedEvent = {
         ...eventData,
         start_at: eventData.time_slot?.[0]?.start_at || eventData.start_at,
@@ -584,19 +587,29 @@ const EventDetailsPage = () => {
                     </button>
                   </div>
 
-                  {event.payment_widget_id && (
-                    <div 
-                      className="mb-4"
-                      dangerouslySetInnerHTML={{ __html: event.payment_widget_id }}
-                    />
+                  {/* Oblakkarte Widget Button */}
+                  {event.oblakkarte_data_event_id && (
+                    <div className="mb-4">
+                      <a 
+                        href="#"
+                        data-oblak-widget
+                        data-event-id={event.oblakkarte_data_event_id}
+                        className="w-full btn-primary block text-center py-3"
+                      >
+                        Купить билет
+                      </a>
+                    </div>
                   )}
 
-                  <button 
-                    onClick={handleRegisterClick}
-                    className="w-full btn-primary mb-4"
-                  >
-                    {event.price === null && event.payment_link ? 'Купить онлайн' : 'Зарегистрироваться'}
-                  </button>
+                  {/* Fallback button if no widget */}
+                  {!event.oblakkarte_data_event_id && (
+                    <button 
+                      onClick={handleRegisterClick}
+                      className="w-full btn-primary mb-4"
+                    >
+                      {event.price === null && event.payment_link ? 'Купить онлайн' : 'Зарегистрироваться'}
+                    </button>
+                  )}
 
                   <div className="space-y-4 text-sm">
                     {event.languages?.length > 0 && (
@@ -622,38 +635,37 @@ const EventDetailsPage = () => {
         </div>
       </main>
 
-// В EventDetailsPage.tsx - обновленная передача пропсов в RegistrationModal
-<RegistrationModal
-  isOpen={showRegistrationModal}
-  onClose={() => setShowRegistrationModal(false)}
-  event={{
-    id: event.id,
-    title: event.title,
-    start_at: event.start_at,
-    location: event.location || '',
-    price: event.price || 0,
-    currency: event.currency || 'RUB',
-    payment_type: event.payment_type,
-    payment_link: event.payment_link,
-    payment_widget_id: event.payment_widget_id,
-    widget_chooser: event.widget_chooser,
-    oblakkarte_data_event_id: event.oblakkarte_data_event_id, // Добавляем это поле!
-    couple_discount: event.couple_discount,
-    child_half_price: event.child_half_price,
-    age_category: event.age_category,
-    registrations: event.registrations
-  }}
-/>
+      <RegistrationModal
+        isOpen={showRegistrationModal}
+        onClose={() => setShowRegistrationModal(false)}
+        event={{
+          id: event.id,
+          title: event.title,
+          start_at: event.start_at,
+          location: event.location || '',
+          price: event.price || 0,
+          currency: event.currency || 'RUB',
+          payment_type: event.payment_type,
+          payment_link: event.payment_link,
+          payment_widget_id: event.payment_widget_id,
+          widget_chooser: event.widget_chooser,
+          oblakkarte_data_event_id: event.oblakkarte_data_event_id,
+          couple_discount: event.couple_discount,
+          child_half_price: event.child_half_price,
+          age_category: event.age_category,
+          registrations: event.registrations
+        }}
+      />
 
-<PaymentOptionsModal
-  isOpen={showPaymentOptions}
-  onClose={() => setShowPaymentOptions(false)}
-  onSelectOption={handlePaymentOptionSelect}
-  hasOnlinePayment={event.payment_type !== 'free' && event.payment_type !== 'donation'}
-  paymentType={event.widget_chooser ? 'widget' : 'link'}
-  paymentLink={event.payment_link}
-  oblakkarteDataEventId={event.oblakkarte_data_event_id}
-/>
+      <PaymentOptionsModal
+        isOpen={showPaymentOptions}
+        onClose={() => setShowPaymentOptions(false)}
+        onSelectOption={handlePaymentOptionSelect}
+        hasOnlinePayment={event.payment_type !== 'free' && event.payment_type !== 'donation'}
+        paymentType={event.widget_chooser ? 'widget' : 'link'}
+        paymentLink={event.payment_link}
+        oblakkarteDataEventId={event.oblakkarte_data_event_id}
+      />
     </Layout>
   );
 };
