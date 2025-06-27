@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
-import { Mail,
-        Phone, 
-        User, 
-        AlertCircle, 
-        CheckCircle, 
-        X, 
-        Calendar, 
-        Clock, 
-        MapPin, 
-        CreditCard,
-       } from 'lucide-react';
+import { 
+  Mail,
+  Phone, 
+  User, 
+  AlertCircle, 
+  CheckCircle, 
+  X, 
+  Calendar, 
+  Clock, 
+  MapPin, 
+  CreditCard
+} from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { formatRussianDate, formatTimeFromTimestamp } from '../../utils/dateTimeUtils';
 import { supabase } from '../../lib/supabase';
@@ -90,6 +91,30 @@ const RegistrationModal = ({ isOpen, onClose, event }: RegistrationModalProps) =
   const isAdultsOnly = event.age_category === '18+';
   
   const roundUpToHundred = (num: number) => Math.ceil(num / 100) * 100;
+
+  // Функция для открытия платежного виджета или ссылки
+  const handlePaymentRedirect = () => {
+    if (event.widget_chooser && event.oblakkarte_data_event_id) {
+      // Для виджета используем глобальный API
+      if (window.OblakWidget) {
+        window.OblakWidget.open({
+          eventId: event.oblakkarte_data_event_id,
+          lang: 'ru'
+        });
+      } else {
+        console.error('Виджет Oblakkarte не загружен');
+        toast.error('Ошибка загрузки платежного виджета');
+      }
+    } else if (event.payment_link) {
+      // Для обычной ссылки
+      window.open(event.payment_link, '_blank');
+    }
+  };
+
+  // Helper function to generate options for select elements
+  const generateOptions = (max: number, start: number = 0) => {
+    return Array.from({ length: max - start + 1 }, (_, i) => start + i);
+  };
 
   // Обновленная функция расчета стоимости
   const calculateTotal = () => {
@@ -182,30 +207,6 @@ const RegistrationModal = ({ isOpen, onClose, event }: RegistrationModalProps) =
     }
 
     return details;
-  };
-
-  // Функция для открытия платежного виджета или ссылки
-  const handlePaymentRedirect = () => {
-    if (event.widget_chooser && event.oblakkarte_data_event_id) {
-      // Для виджета используем глобальный API
-      if (window.OblakWidget) {
-        window.OblakWidget.open({
-          eventId: event.oblakkarte_data_event_id,
-          lang: 'ru'
-        });
-      } else {
-        console.error('Виджет Oblakkarte не загружен');
-        toast.error('Ошибка загрузки платежного виджета');
-      }
-    } else if (event.payment_link) {
-      // Для обычной ссылки
-      window.open(event.payment_link, '_blank');
-    }
-  };
-
-  // Helper function to generate options for select elements
-  const generateOptions = (max: number, start: number = 0) => {
-    return Array.from({ length: max - start + 1 }, (_, i) => start + i);
   };
 
   const resetForm = () => {
