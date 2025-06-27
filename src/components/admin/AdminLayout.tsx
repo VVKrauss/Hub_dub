@@ -1,5 +1,5 @@
 // src/components/admin/AdminLayout.tsx
-import { Outlet, NavLink, useNavigate, Link } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { createClient } from '@supabase/supabase-js';
 import { useState, useEffect } from 'react';
 import { 
@@ -21,7 +21,8 @@ import {
   ChevronLeft,
   ChevronRight,
   TrendingUp,
-  QrCode
+  QrCode,
+  Globe
 } from 'lucide-react';
 
 import { toast } from 'react-hot-toast';
@@ -34,6 +35,7 @@ const supabase = createClient(
 
 const AdminLayout = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -68,6 +70,7 @@ const AdminLayout = () => {
     { to: '/admin/navigation', icon: Menu, label: 'Навигация', shortLabel: 'Навиг.' },
     { to: '/admin/calendar', icon: Calendar, label: 'Календарь', shortLabel: 'Календ.' },
     { to: '/admin/event-statistics', icon: TrendingUp, label: 'Статистика мероприятий', shortLabel: 'Стат. мер.' },
+    { to: '/admin/oblakkarte-stats', icon: Globe, label: 'Статистика Oblakkarte', shortLabel: 'Oblakkarte' },
     { to: '/admin/export', icon: Download, label: 'Экспорт данных', shortLabel: 'Экспорт' }
   ];
 
