@@ -20,6 +20,9 @@ import AdminAbout from './pages/admin/AdminAbout';
 import AdminNavigation from './pages/admin/AdminNavigation';
 import AdminExport from './pages/admin/AdminExport';
 import AdminEventStatistics from './pages/admin/AdminEventStatistics';
+import AdminAttendance from './pages/admin/AdminAttendance';
+import AdminOblaKarteStats from './pages/admin/AdminOblaKarteStats';
+import AdminOblaKarteStats from './pages/admin/AdminOblaKarteStats';
 import ProtectedRoute from './components/admin/ProtectedRoute';
 import PublicProtectedRoute from './components/auth/PublicProtectedRoute';
 import AdminCalendarPage from './pages/admin/AdminCalendarPage';
@@ -73,6 +76,8 @@ function App() {
           <Route path="export" element={<AdminExport />} />
           <Route path="calendar" element={<AdminCalendarPage />} />
           <Route path="event-statistics" element={<AdminEventStatistics />} />
+          <Route path="attendance" element={<AdminAttendance />} />
+          <Route path="oblakkarte-stats" element={<AdminOblaKarteStats />} />
         </Route>
 
         {/* 404 route */}
