@@ -645,7 +645,6 @@ const EventDetailsPage = () => {
   }}
 />
 
-// Также в PaymentOptionsModal
 <PaymentOptionsModal
   isOpen={showPaymentOptions}
   onClose={() => setShowPaymentOptions(false)}
