@@ -1,8 +1,9 @@
-// 3. Создаем компонент ImageUploader.tsx
 import { useState, useRef } from 'react';
 import Cropper from 'react-cropper';
 import 'cropperjs/dist/cropper.css';
 import imageCompression from 'browser-image-compression';
+import { Upload, Trash2 } from 'lucide-react';
+import { Button } from '../../shared/ui/Button/Button';
 
 export const ImageUploader = ({
   onUploadComplete,
@@ -91,20 +92,18 @@ export const ImageUploader = ({
           onInitialized={instance => setCropper(instance)}
         />
         <div className="flex justify-end gap-4">
-          <button
-            type="button"
+          <Button
+            variant="outline"
             onClick={() => setShowCropper(false)}
-            className="btn-outline"
           >
             Отмена
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="primary"
             onClick={handleCrop}
-            className="btn-primary"
           >
             Обрезать и сохранить
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -118,13 +117,14 @@ export const ImageUploader = ({
           alt="Preview"
           className="w-full h-48 object-cover rounded-lg"
         />
-        <button
-          type="button"
+        <Button
+          variant="danger"
+          size="sm"
           onClick={onRemove}
-          className="absolute top-2 right-2 p-2 bg-red-600 text-white rounded-full hover:bg-red-700"
+          className="absolute top-2 right-2 rounded-full"
+          leftIcon={<Trash2 className="h-4 w-4" />}
         >
-          <Trash2 className="h-5 w-5" />
-        </button>
+        </Button>
       </div>
     );
   }
@@ -138,14 +138,13 @@ export const ImageUploader = ({
         onChange={handleImageSelect}
         className="hidden"
       />
-      <button
-        type="button"
+      <Button
+        variant="outline"
         onClick={() => fileInputRef.current?.click()}
-        className="btn-outline inline-flex items-center gap-2"
+        leftIcon={<Upload className="h-5 w-5" />}
       >
-        <Upload className="h-5 w-5" />
         Загрузить изображение
-      </button>
+      </Button>
       <p className="mt-2 text-sm text-dark-500">
         {recommendedText}
       </p>
