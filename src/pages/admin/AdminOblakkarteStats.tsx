@@ -14,9 +14,11 @@ import {
   Download,
   Clock,
   TrendingUp,
-  Activity
+  Activity,
+  Settings
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import ApiSettings from '../../components/admin/ApiSettings';
 
 interface OblakkarteEvent {
   uuid: string;
@@ -91,6 +93,7 @@ const AdminOblakkarteStats: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [showApiSettings, setShowApiSettings] = useState(false);
 
   const fetchOblakkarteData = async () => {
     try {
@@ -375,6 +378,13 @@ const AdminOblakkarteStats: React.FC = () => {
         </div>
         <div className="flex gap-2">
           <button
+            onClick={() => setShowApiSettings(!showApiSettings)}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
+          >
+            <Settings className="h-4 w-4" />
+            API настройки
+          </button>
+          <button
             onClick={fetchOblakkarteData}
             disabled={loading}
             className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
@@ -392,6 +402,13 @@ const AdminOblakkarteStats: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* API Settings Panel */}
+      {showApiSettings && (
+        <div className="mb-6">
+          <ApiSettings />
+        </div>
+      )}
 
       {/* Error State */}
       {error && (
