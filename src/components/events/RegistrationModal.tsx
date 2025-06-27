@@ -577,4 +577,4 @@ const RegistrationModal = ({ isOpen, onClose, event }: RegistrationModalProps) =
   );
 };
 
-export default RegistrationModal;
+export default RegistrationModal; 
