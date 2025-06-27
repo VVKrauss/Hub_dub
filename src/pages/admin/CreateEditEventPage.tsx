@@ -810,7 +810,94 @@ const CreateEditEventPage = () => {
           </div>
         </div>
 
- // src/pages/admin/CreateEditEventPage.tsx - Часть 6
+// src/pages/admin/CreateEditEventPage.tsx - Часть 6
+
+        {/* Обложка мероприятия */}
+        <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-dark-600 p-6">
+          <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
+            <ImageIcon className="h-5 w-5 text-primary-600" />
+            Обложка мероприятия
+          </h2>
+          
+          <div className="space-y-4">
+            {event.bg_image && (
+              <div className="relative inline-block">
+                <img
+                  src={getImageUrl(event.bg_image)}
+                  alt="Обложка мероприятия"
+                  className="w-full max-w-md h-48 object-cover rounded-lg"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = 'https://via.placeholder.com/400x200?text=Image+not+found';
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setEvent(prev => ({ ...prev, bg_image: '' }))}
+                  className="absolute top-2 right-2 p-1 bg-red-600 text-white rounded-full hover:bg-red-700 transition-colors"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+            
+            <div className="flex items-center gap-4">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white rounded-lg transition-colors"
+              >
+                <Upload className="h-5 w-5" />
+                {isUploading ? 'Загрузка...' : 'Загрузить изображение'}
+              </button>
+              
+              {isUploading && (
+                <div className="flex-1 bg-gray-200 dark:bg-dark-700 rounded-full h-2">
+                  <div
+                    className="bg-primary-600 h-2 rounded-full transition-all"
+                    style={{ width: `${uploadProgress}%` }}
+                  ></div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Языки */}
+        <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-dark-600 p-6">
+          <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
+            <Globe className="h-5 w-5 text-primary-600" />
+            Языки проведения
+          </h2>
+          
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+            {availableLanguages.map(language => (
+              <label
+                key={language}
+                className="flex items-center gap-2 p-3 border border-gray-300 dark:border-dark-600 rounded-lg hover:bg-gray-50 dark:hover:bg-dark-700 cursor-pointer transition-colors"
+              >
+                <input
+                  type="checkbox"
+                  value={language}
+                  checked={event.languages.includes(language)}
+                  onChange={handleLanguageChange}
+                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                />
+                <span className="text-sm font-medium">{language}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+// src/pages/admin/CreateEditEventPage.tsx - Часть 6
 
         {/* Обложка мероприятия */}
         <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-dark-600 p-6">
@@ -898,11 +985,86 @@ const CreateEditEventPage = () => {
         </div>
 
         {/* Галерея фотографий */}
-        <PhotoGallerySection
-          photos={event.photo_gallery}
-          onPhotosChange={handlePhotoGalleryChange}
-        />
-
+        <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-dark-600 p-6">
+          <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
+            <ImageIcon className="h-5 w-5 text-primary-600" />
+            Галерея фотографий
+          </h2>
+          
+          <div className="space-y-4">
+            {Array.isArray(event.photo_gallery) && event.photo_gallery.map((photo, index) => (
+              <div key={index} className="flex items-center gap-3 p-3 border border-gray-300 dark:border-dark-600 rounded-lg">
+                <input
+                  type="url"
+                  value={photo}
+                  onChange={(e) => {
+                    const newGallery = [...event.photo_gallery];
+                    newGallery[index] = e.target.value;
+                    setEvent(prev => ({
+                      ...prev,
+                      photo_gallery: newGallery
+                    }));
+                  }}
+                  className="flex-1 px-3 py-2 rounded border border-gray-300 dark:border-dark-600 bg-white dark:bg-dark-800 text-gray-900 dark:text-white focus:outline-none focus:border-primary-500"
+                  placeholder="URL фотографии"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newGallery = event.photo_gallery.filter((_, i) => i !== index);
+                    setEvent(prev => ({
+                      ...prev,
+                      photo_gallery: newGallery
+                    }));
+                  }}
+                  className="p-2 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 transition-colors"
+                  title="Удалить фотографию"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+            
+            <button
+              type="button"
+              onClick={() => {
+                setEvent(prev => ({
+                  ...prev,
+                  photo_gallery: [...(Array.isArray(prev.photo_gallery) ? prev.photo_gallery : []), '']
+                }));
+              }}
+              className="flex items-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 dark:border-dark-600 rounded-lg text-gray-600 dark:text-gray-400 hover:border-primary-500 hover:text-primary-600 dark:hover:text-primary-400 transition-colors w-full"
+            >
+              <Plus className="h-4 w-4" />
+              Добавить фотографию
+            </button>
+            
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              Вставьте прямую ссылку на изображение (например, из облачного хранилища)
+            </p>
+            
+            {Array.isArray(event.photo_gallery) && event.photo_gallery.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
+                {event.photo_gallery
+                  .filter(photo => typeof photo === 'string' && photo.trim() !== '')
+                  .map((photo, index) => (
+                    <div key={index} className="relative group">
+                      <img
+                        src={photo}
+                        alt={`Preview ${index + 1}`}
+                        className="w-full h-24 object-cover rounded-lg"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.src = 'https://via.placeholder.com/150x100?text=Не+найдено';
+                        }}
+                      />
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+        </div>
+        
         // src/pages/admin/CreateEditEventPage.tsx - Часть 7
 
         {/* Информация об оплате */}
