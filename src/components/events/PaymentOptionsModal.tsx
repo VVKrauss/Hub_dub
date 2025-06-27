@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { CreditCard, MapPin, Loader2 } from 'lucide-react';
+import { CreditCard, MapPin } from 'lucide-react';
+import { useEffect } from 'react';
 import Modal from '../ui/Modal';
 
 type PaymentOptionsModalProps = {
@@ -12,15 +12,6 @@ type PaymentOptionsModalProps = {
   oblakkarteDataEventId?: string; // ID события для виджета
 };
 
-// Типы для виджета Oblakkarte
-declare global {
-  interface Window {
-    OblakWidget?: {
-      open: (options: { eventId: string; lang: string }) => void;
-    };
-  }
-}
-
 const PaymentOptionsModal = ({
   isOpen,
   onClose,
@@ -30,59 +21,35 @@ const PaymentOptionsModal = ({
   paymentLink,
   oblakkarteDataEventId
 }: PaymentOptionsModalProps) => {
-  const [isWidgetLoading, setIsWidgetLoading] = useState(false);
-  const [isWidgetReady, setIsWidgetReady] = useState(false);
 
-  // Проверяем доступность виджета при открытии модального окна
+  // Загружаем скрипт виджета один раз при монтировании компонента
   useEffect(() => {
-    if (!isOpen) return;
-    
-    // Проверяем, не загружен ли уже виджет и не доступен ли уже
-    if (window.OblakWidget) {
-      setIsWidgetReady(true);
+    // Проверяем, не загружен ли уже скрипт
+    if (document.querySelector('script[src="https://widget.oblakkarte.rs/widget.js"]')) {
       return;
     }
 
-    // Проверяем, загружен ли скрипт
-    const checkWidgetAvailability = () => {
-      let attempts = 0;
-      const maxAttempts = 50; // Максимум 5 секунд (50 * 100ms)
-      
-      const checkInterval = setInterval(() => {
-        attempts++;
-        
-        if (window.OblakWidget) {
-          clearInterval(checkInterval);
-          setIsWidgetReady(true);
-          setIsWidgetLoading(false);
-        } else if (attempts >= maxAttempts) {
-          clearInterval(checkInterval);
-          setIsWidgetLoading(false);
-          console.error('Не удалось загрузить виджет Oblakkarte после нескольких попыток');
-        }
-      }, 100);
-    };
+    // Создаем и загружаем скрипт виджета
+    const script = document.createElement('script');
+    script.src = 'https://widget.oblakkarte.rs/widget.js';
+    script.async = true;
+    script.setAttribute('data-organizer-public-token', 'Yi0idjZg');
+    
+    document.head.appendChild(script);
 
-    checkWidgetAvailability();
-  }, [isOpen]);
+    // Очистка при размонтировании компонента
+    return () => {
+      const existingScript = document.querySelector('script[src="https://widget.oblakkarte.rs/widget.js"]');
+      if (existingScript) {
+        existingScript.remove();
+      }
+    };
+  }, []);
 
   const handleOnlinePayment = () => {
     if (paymentType === 'widget' && oblakkarteDataEventId) {
-      if (window.OblakWidget) {
-        try {
-          window.OblakWidget.open({
-            eventId: oblakkarteDataEventId,
-            lang: 'ru'
-          });
-          onClose();
-        } catch (error) {
-          console.error('Ошибка при открытии виджета Oblakkarte:', error);
-          alert('Произошла ошибка при открытии виджета оплаты. Пожалуйста, попробуйте позже.');
-        }
-      } else {
-        console.error('Виджет Oblakkarte не загружен');
-        alert('Виджет оплаты не загрузился. Пожалуйста, обновите страницу и попробуйте снова.');
-      }
+      // Виджет откроется автоматически при клике на кнопку с data-oblak-widget
+      return;
     } else if (paymentType === 'link' && paymentLink) {
       // Переход по ссылке
       window.open(paymentLink, '_blank');
@@ -103,30 +70,25 @@ const PaymentOptionsModal = ({
         {hasOnlinePayment && (
           <>
             {paymentType === 'widget' && oblakkarteDataEventId ? (
-              // Кнопка виджета
-              <button
-                onClick={handleOnlinePayment}
-                disabled={isWidgetLoading && !isWidgetReady}
-                className={`w-full p-4 border-2 border-primary-500 rounded-lg hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors flex items-center gap-4 text-left ${
-                  isWidgetLoading && !isWidgetReady ? 'opacity-70 cursor-wait' : ''
-                }`}
+              // Кнопка виджета согласно документации
+              <a
+                href="#"
+                data-oblak-widget
+                data-event-id={oblakkarteDataEventId}
+                data-lang="ru"
+                className="w-full p-4 border-2 border-primary-500 rounded-lg hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors flex items-center gap-4 text-left no-underline"
+                onClick={(e) => e.preventDefault()}
               >
                 <div className="p-2 bg-primary-100 dark:bg-primary-900/30 rounded-full">
-                  {isWidgetLoading && !isWidgetReady ? (
-                    <Loader2 className="h-6 w-6 text-primary-600 dark:text-primary-400 animate-spin" />
-                  ) : (
-                    <CreditCard className="h-6 w-6 text-primary-600 dark:text-primary-400" />
-                  )}
+                  <CreditCard className="h-6 w-6 text-primary-600 dark:text-primary-400" />
                 </div>
                 <div className="text-left">
                   <h3 className="font-medium text-gray-900 dark:text-white">Купить билет онлайн</h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {isWidgetLoading && !isWidgetReady 
-                      ? 'Загрузка виджета оплаты...' 
-                      : 'Оплатите сейчас картой или электронным кошельком'}
+                    Оплатите сейчас картой или электронным кошельком
                   </p>
                 </div>
-              </button>
+              </a>
             ) : (
               // Обычная кнопка для ссылки
               <button

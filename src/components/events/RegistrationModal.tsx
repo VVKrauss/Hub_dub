@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Mail, Phone, User, AlertCircle, CheckCircle, X, Calendar, Clock, MapPin, CreditCard } from 'lucide-react';
+import { X, Calendar, Clock, MapPin, CreditCard, CheckCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { formatRussianDate, formatTimeFromTimestamp } from '../../utils/dateTimeUtils';
 import { supabase } from '../../lib/supabase';
@@ -74,36 +74,30 @@ const RegistrationModal = ({ isOpen, onClose, event }: RegistrationModalProps) =
     }
   }, [isOpen, currentUser]);
 
+  // Загружаем скрипт виджета Oblakkarte при открытии модального окна
+  useEffect(() => {
+    if (isOpen && event.widget_chooser && event.oblakkarte_data_event_id) {
+      // Проверяем, не загружен ли уже скрипт
+      if (document.querySelector('script[src="https://widget.oblakkarte.rs/widget.js"]')) {
+        return;
+      }
+
+      // Создаем и загружаем скрипт виджета
+      const script = document.createElement('script');
+      script.src = 'https://widget.oblakkarte.rs/widget.js';
+      script.async = true;
+      script.setAttribute('data-organizer-public-token', 'Yi0idjZg');
+      
+      document.head.appendChild(script);
+    }
+  }, [isOpen, event.widget_chooser, event.oblakkarte_data_event_id]);
+
   const isFreeOrDonation = event.payment_type === 'free' || event.payment_type === 'donation';
   
   // Функция для определения, только ли для взрослых мероприятие
   const isAdultsOnly = event.age_category === '18+';
   
   const roundUpToHundred = (num: number) => Math.ceil(num / 100) * 100;
-
-  // Функция для открытия платежного виджета или ссылки
-  const handlePaymentRedirect = () => {
-    if (event.widget_chooser && event.oblakkarte_data_event_id) {
-      // Для виджета используем глобальный API
-      if (window.OblakWidget) {
-        window.OblakWidget.open({
-          eventId: event.oblakkarte_data_event_id,
-          lang: 'ru'
-        });
-      } else {
-        console.error('Виджет Oblakkarte не загружен');
-        toast.error('Ошибка загрузки платежного виджета');
-      }
-    } else if (event.payment_link) {
-      // Для обычной ссылки
-      window.open(event.payment_link, '_blank');
-    }
-  };
-
-  // Helper function to generate options for select elements
-  const generateOptions = (max: number, start: number = 0) => {
-    return Array.from({ length: max - start + 1 }, (_, i) => start + i);
-  };
 
   // Обновленная функция расчета стоимости
   const calculateTotal = () => {
@@ -198,6 +192,31 @@ const RegistrationModal = ({ isOpen, onClose, event }: RegistrationModalProps) =
     return details;
   };
 
+  // Функция для открытия платежного виджета или ссылки
+  const handlePaymentRedirect = () => {
+    if (event.widget_chooser && event.oblakkarte_data_event_id) {
+      // Для виджета создаем программный клик по элементу с data-oblak-widget
+      const widgetButton = document.querySelector(`[data-event-id="${event.oblakkarte_data_event_id}"]`);
+      if (widgetButton) {
+        (widgetButton as HTMLElement).click();
+      } else {
+        // Fallback: открываем виджет программно через глобальный объект
+        if (window.OblakWidget) {
+          window.OblakWidget.open({
+            eventId: event.oblakkarte_data_event_id,
+            lang: 'ru'
+          });
+        } else {
+          console.error('Виджет Oblakkarte не загружен');
+          toast.error('Ошибка загрузки платежного виджета');
+        }
+      }
+    } else if (event.payment_link) {
+      // Для обычной ссылки
+      window.open(event.payment_link, '_blank');
+    }
+  };
+
   const resetForm = () => {
     setFormData({
       name: currentUser?.name || '',
@@ -239,13 +258,27 @@ const RegistrationModal = ({ isOpen, onClose, event }: RegistrationModalProps) =
         created_at: new Date().toISOString()
       };
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('event_registrations')
         .insert({
           event_id: event.id,
           user_id: currentUser?.id || null,
           ...registrationData
-        });
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const { data, error } = await supabase
+        .from('event_registrations')
+        .insert({
+          event_id: event.id,
+          user_id: currentUser?.id || null,
+          ...registrationData
+        })
+        .select()
+        .single();
 
       if (error) throw error;
 
@@ -337,12 +370,28 @@ const RegistrationModal = ({ isOpen, onClose, event }: RegistrationModalProps) =
               {/* Кнопки для оплаты или закрытия */}
               <div className="space-y-3">
                 {event.payment_type === 'cost' && (
-                  <button
-                    onClick={handlePaymentRedirect}
-                    className="w-full bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 transition-colors font-medium"
-                  >
-                    {event.widget_chooser ? 'Открыть виджет оплаты' : 'Перейти к оплате'}
-                  </button>
+                  <>
+                    {event.widget_chooser && event.oblakkarte_data_event_id ? (
+                      // Скрытая кнопка для виджета (будет программно активирована)
+                      <a
+                        href="#"
+                        data-oblak-widget
+                        data-event-id={event.oblakkarte_data_event_id}
+                        data-lang="ru"
+                        style={{ display: 'none' }}
+                        onClick={(e) => e.preventDefault()}
+                      >
+                        Widget Button
+                      </a>
+                    ) : null}
+                    
+                    <button
+                      onClick={handlePaymentRedirect}
+                      className="w-full bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 transition-colors font-medium"
+                    >
+                      {event.widget_chooser ? 'Открыть виджет оплаты' : 'Перейти к оплате'}
+                    </button>
+                  </>
                 )}
                 
                 <button
@@ -528,4 +577,4 @@ const RegistrationModal = ({ isOpen, onClose, event }: RegistrationModalProps) =
   );
 };
 
-export default RegistrationModal;
+export default RegistrationModal; 
