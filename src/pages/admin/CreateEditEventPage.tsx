@@ -437,7 +437,7 @@ const CreateEditEventPage = () => {
     return eventData;
   };
 
-  // src/pages/admin/CreateEditEventPage.tsx - Часть 4
+  // src/pages/admin/CreateEditEventPage.tsx - Часть 4 
 
   // Отправка формы
   const handleSubmit = async (e: React.FormEvent) => {
@@ -614,7 +614,7 @@ const CreateEditEventPage = () => {
       </div>
       
       
-      // src/pages/admin/CreateEditEventPage.tsx - Часть 5
+      {/* // src/pages/admin/CreateEditEventPage.tsx - Часть 5 */}
 
       {/* Основная форма */}
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -809,7 +809,7 @@ const CreateEditEventPage = () => {
           </div>
         </div>
 
-// src/pages/admin/CreateEditEventPage.tsx - Часть 6
+{/* // src/pages/admin/CreateEditEventPage.tsx - Часть 6 */}
 
         {/* Обложка мероприятия */}
         <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-dark-600 p-6">
@@ -896,7 +896,7 @@ const CreateEditEventPage = () => {
           </div>
         </div>
 
-// src/pages/admin/CreateEditEventPage.tsx - Часть 6
+{/* // src/pages/admin/CreateEditEventPage.tsx - Часть 6 */}
 
         {/* Обложка мероприятия */}
         <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-dark-600 p-6">
@@ -1064,7 +1064,7 @@ const CreateEditEventPage = () => {
           </div>
         </div>
         
-        // src/pages/admin/CreateEditEventPage.tsx - Часть 7
+        {/* // src/pages/admin/CreateEditEventPage.tsx - Часть 7 */}
 
         {/* Информация об оплате */}
         <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-dark-600 p-6">
@@ -1284,7 +1284,7 @@ const CreateEditEventPage = () => {
           </div>
         </div>
 
-// src/pages/admin/CreateEditEventPage.tsx - Часть 8 (Финальная часть)
+{/* // src/pages/admin/CreateEditEventPage.tsx - Часть 8 (Финальная часть) */}
 
         {/* Секция спикеров */}
         <EventSpeakersSection
