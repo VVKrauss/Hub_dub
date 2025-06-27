@@ -1,9 +1,11 @@
 import { useState, useRef, useCallback } from 'react';
-import { Upload, X, Check, Image as ImageIcon } from 'lucide-react';
+import { Upload, X, Check, Image as ImageIcon, Loader2 } from 'lucide-react';
 import Cropper from 'react-cropper';
 import 'cropperjs/dist/cropper.css';
 import { supabase } from '../../lib/supabase';
 import { compressImage, generateUniqueFilename } from '../../utils/imageUtils';
+import { Button } from '../../shared/ui/Button/Button';
+import { Modal } from '../../shared/ui/Modal/Modal';
 
 interface ImageUploadAndCropProps {
   aspectRatio?: number;
@@ -43,93 +45,234 @@ const ImageUploadAndCrop = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Проверка типа файла
+    if (!file.type.startsWith('image/')) {
+      alert('Пожалуйста, выберите файл изображения');
+      return;
+    }
+
+    // Проверка размера файла (максимум 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Размер файла не должен превышать 10MB');
+      return;
+    }
+
     try {
-      // Compress the image before cropping
       const compressedFile = await compressImage(file, {
         maxWidthOrHeight: 2000,
-        maxSizeMB: 2,
+        maxSizeMB: 5,
         useWebWorker: true
       });
 
       setImageFile(compressedFile);
       setShowCropper(true);
     } catch (error) {
-      console.error('Error processing image:', error);
+      console.error('Error compressing image:', error);
       alert('Ошибка при обработке изображения');
     }
   };
 
-  const handleCrop = async () => {
+  const handleCrop = useCallback(async () => {
     if (!cropper || !imageFile) return;
 
     try {
       setUploading(true);
-      setUploadProgress(0);
+      setUploadProgress(10);
 
-      // Get cropped canvas
-      const croppedCanvas = cropper.getCroppedCanvas({
+      // Получаем обрезанное изображение
+      const canvas = cropper.getCroppedCanvas({
         width: targetWidth,
         height: targetHeight,
-        fillColor: '#fff',
         imageSmoothingEnabled: true,
-        imageSmoothingQuality: 'high',
+        imageSmoothingQuality: 'high'
       });
 
-      // Convert canvas to blob
-      const blob = await new Promise<Blob>((resolve) => {
-        croppedCanvas.toBlob((b) => {
-          if (b) resolve(b);
-          else throw new Error('Failed to create blob');
-        }, 'image/jpeg', 0.9);
-      });
+      if (!canvas) {
+        throw new Error('Не удалось обрезать изображение');
+      }
 
-      // Create file from blob
-      const fileName = generateUniqueFilename(imageFile, storagePathPrefix);
+      setUploadProgress(30);
 
-      // Upload to Supabase with progress tracking
-      const { data, error } = await supabase.storage
-        .from(storageBucket)
-        .upload(fileName, blob, {
-          cacheControl: '3600',
-          upsert: false,
-          contentType: 'image/jpeg',
-          onUploadProgress: (progress) => {
-            const percent = Math.round((progress.loaded / progress.total) * 100);
-            setUploadProgress(percent);
+      // Конвертируем в blob
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error('Не удалось создать blob'));
+            }
           },
+          'image/jpeg',
+          0.9
+        );
+      });
+
+      setUploadProgress(50);
+
+      // Генерируем уникальное имя файла
+      const fileName = generateUniqueFilename(imageFile, storagePathPrefix);
+      const filePath = `${storagePathPrefix}/${fileName}`;
+
+      setUploadProgress(70);
+
+      // Загружаем в Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from(storageBucket)
+        .upload(filePath, blob, {
+          cacheControl: '3600',
+          upsert: false
         });
 
-      if (error) throw error;
+      if (uploadError) {
+        throw uploadError;
+      }
 
-      // Get public URL
-      const { data: urlData } = supabase.storage
+      setUploadProgress(90);
+
+      // Получаем публичный URL
+      const { data: { publicUrl } } = supabase.storage
         .from(storageBucket)
-        .getPublicUrl(fileName);
+        .getPublicUrl(filePath);
 
-      onUploadSuccess(urlData.publicUrl, fileName);
-      
-      // Reset state
+      setUploadProgress(100);
+
+      // Вызываем callback
+      onUploadSuccess(publicUrl, filePath);
+
+      // Сбрасываем состояние
       setShowCropper(false);
       setImageFile(null);
       setUploadProgress(0);
+
     } catch (error) {
       console.error('Error uploading image:', error);
       alert('Ошибка при загрузке изображения');
     } finally {
       setUploading(false);
     }
-  };
+  }, [cropper, imageFile, targetWidth, targetHeight, storagePathPrefix, storageBucket, onUploadSuccess]);
 
-  const cancelCrop = () => {
+  const handleCancel = () => {
     setShowCropper(false);
     setImageFile(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+    setUploadProgress(0);
+  };
+
+  const handleRemove = () => {
+    if (onRemoveImage) {
+      onRemoveImage();
     }
   };
 
+  // Модальное окно с кроппером
+  if (showCropper && imageFile) {
+    return (
+      <Modal
+        isOpen={showCropper}
+        onClose={handleCancel}
+        title="Обрезать изображение"
+        size="lg"
+        closeOnOverlayClick={!uploading}
+        closeOnEsc={!uploading}
+      >
+        <div className="space-y-4">
+          <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4">
+            <Cropper
+              src={URL.createObjectURL(imageFile)}
+              style={{ height: 400, width: '100%' }}
+              aspectRatio={aspectRatio}
+              guides={true}
+              background={false}
+              responsive={true}
+              autoCropArea={1}
+              checkOrientation={false}
+              onInitialized={(instance) => setCropper(instance)}
+              viewMode={1}
+              dragMode="move"
+              scalable={true}
+              zoomable={true}
+              rotatable={true}
+            />
+          </div>
+
+          {/* Прогресс загрузки */}
+          {uploading && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-600 dark:text-gray-300">
+                  Загрузка изображения...
+                </span>
+                <span className="text-primary-600 font-medium">
+                  {uploadProgress}%
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div 
+                  className="bg-primary-600 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-between items-center pt-4">
+            <div className="text-sm text-gray-500 dark:text-gray-400">
+              {recommendedText}
+            </div>
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={handleCancel}
+                disabled={uploading}
+              >
+                Отмена
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleCrop}
+                loading={uploading}
+                leftIcon={!uploading ? <Check className="h-4 w-4" /> : undefined}
+              >
+                {uploading ? 'Загрузка...' : 'Сохранить'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Modal>
+    );
+  }
+
+  // Превью загруженного изображения
+  if (initialImageUrl) {
+    return (
+      <div className={`relative group ${className}`}>
+        <div className="relative overflow-hidden rounded-lg border-2 border-gray-200 dark:border-gray-600">
+          <img
+            src={initialImageUrl}
+            alt="Uploaded preview"
+            className="w-full h-48 object-cover"
+          />
+          
+          {/* Оверлей с кнопкой удаления */}
+          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={handleRemove}
+              leftIcon={<X className="h-4 w-4" />}
+            >
+              Удалить
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Компонент загрузки
   return (
-    <div className={`image-upload-container ${className}`}>
+    <div className={`${className}`}>
       <input
         ref={fileInputRef}
         type="file"
@@ -137,114 +280,40 @@ const ImageUploadAndCrop = ({
         onChange={handleImageSelect}
         className="hidden"
       />
-
-      {showCropper && imageFile ? (
+      
+      <div 
+        className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center hover:border-primary-400 dark:hover:border-primary-500 transition-colors duration-200 cursor-pointer"
+        onClick={() => fileInputRef.current?.click()}
+      >
         <div className="space-y-4">
-          <Cropper
-            src={URL.createObjectURL(imageFile)}
-            style={{ height: 400, width: '100%' }}
-            aspectRatio={aspectRatio}
-            guides={true}
-            viewMode={1}
-            dragMode="move"
-            scalable={true}
-            cropBoxMovable={true}
-            cropBoxResizable={true}
-            onInitialized={(instance) => setCropper(instance)}
-            className="max-w-full"
-          />
+          <div className="flex justify-center">
+            <div className="w-12 h-12 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
+              <ImageIcon className="h-6 w-6 text-gray-400 dark:text-gray-500" />
+            </div>
+          </div>
           
-          {uploading && (
-            <div className="mt-4">
-              <div className="flex justify-between mb-1">
-                <span className="text-sm font-medium">Загрузка</span>
-                <span className="text-sm font-medium">{uploadProgress}%</span>
-              </div>
-              <div className="w-full bg-gray-200 dark:bg-dark-700 rounded-full h-2.5">
-                <div 
-                  className="bg-primary-600 h-2.5 rounded-full transition-all duration-300" 
-                  style={{ width: `${uploadProgress}%` }}
-                ></div>
-              </div>
-            </div>
-          )}
-
-          <div className="flex justify-end gap-3">
-            <button
-              type="button"
-              onClick={cancelCrop}
-              disabled={uploading}
-              className="px-4 py-2 border border-gray-300 dark:border-dark-600 rounded-md hover:bg-gray-50 dark:hover:bg-dark-700 transition-colors disabled:opacity-50"
-            >
-              <X className="h-4 w-4 mr-2 inline-block" />
-              Отмена
-            </button>
-            <button
-              type="button"
-              onClick={handleCrop}
-              disabled={uploading}
-              className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors disabled:opacity-50"
-            >
-              {uploading ? (
-                <>
-                  <span className="animate-pulse">Загрузка...</span>
-                </>
-              ) : (
-                <>
-                  <Check className="h-4 w-4 mr-2 inline-block" />
-                  Сохранить
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      ) : initialImageUrl ? (
-        <div className="relative">
-          <img
-            src={initialImageUrl}
-            alt="Preview"
-            className="w-full h-48 object-cover rounded-lg"
-          />
-          <div className="absolute bottom-2 right-2 flex gap-2">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="p-2 bg-white/90 hover:bg-white text-dark-800 rounded-full shadow-lg"
-              title="Изменить изображение"
-            >
-              <Upload className="h-5 w-5" />
-            </button>
-            {onRemoveImage && (
-              <button
-                type="button"
-                onClick={onRemoveImage}
-                className="p-2 bg-red-600/90 hover:bg-red-600 text-white rounded-full shadow-lg"
-                title="Удалить изображение"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            )}
-          </div>
-        </div>
-      ) : (
-        <div className="border-2 border-dashed border-gray-300 dark:border-dark-600 rounded-lg p-8 text-center">
-          <div className="flex flex-col items-center">
-            <div className="mb-4 p-3 bg-gray-100 dark:bg-dark-700 rounded-full">
-              <ImageIcon className="h-6 w-6 text-gray-500 dark:text-gray-400" />
-            </div>
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md transition-colors"
+          <div className="space-y-2">
+            <Button
+              variant="outline"
+              onClick={(e) => {
+                e.stopPropagation();
+                fileInputRef.current?.click();
+              }}
+              leftIcon={<Upload className="h-4 w-4" />}
             >
               {buttonText}
-            </button>
-            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+            </Button>
+            
+            <p className="text-sm text-gray-500 dark:text-gray-400">
               {recommendedText}
+            </p>
+            
+            <p className="text-xs text-gray-400 dark:text-gray-500">
+              Поддерживаются: JPG, PNG, GIF (до 10MB)
             </p>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 };
