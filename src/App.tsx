@@ -110,7 +110,7 @@ function App() {
             />
           </div>
         </Router>
-      </AuthContextProvider> 
+      </AuthContextProvider>   
     </QueryProvider>
   );
 }
