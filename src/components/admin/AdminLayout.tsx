@@ -21,7 +21,7 @@ import {
   ChevronRight,
   TrendingUp,
   Camera,
-  Ticket // Добавляем импорт для OblaKarte
+  Ticket
 } from 'lucide-react';
 
 import { toast } from 'react-hot-toast';
@@ -57,7 +57,7 @@ const AdminLayout = () => {
     { to: '/admin/events', icon: Calendar, label: 'Мероприятия', shortLabel: 'События' },
     { to: '/admin/speakers', icon: Users, label: 'Спикеры', shortLabel: 'Спикеры' },
     { to: '/admin/attendance', icon: Camera, label: 'Посещения', shortLabel: 'QR-код' },
-    { to: '/admin/oblakkarte-stats', icon: Ticket, label: 'OblaKarte статистика', shortLabel: 'OblaKarte' }, // Новый пункт
+    { to: '/admin/oblakkarte-stats', icon: Ticket, label: 'OblaKarte статистика', shortLabel: 'OblaKarte' },
     { to: '/admin/rent', icon: Building2, label: 'Аренда', shortLabel: 'Аренда' },
     { to: '/admin/coworking', icon: Briefcase, label: 'Коворкинг', shortLabel: 'Коворк' },
     { to: '/admin/about', icon: Info, label: 'О нас', shortLabel: 'О нас' },
