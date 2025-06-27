@@ -1,49 +1,56 @@
 // src/components/favorites/FavoriteButton.tsx
 import React from 'react';
 import { Heart } from 'lucide-react';
+import { Button } from '../../shared/ui/Button/Button';
+import { cn } from '../../shared/utils/cn';
 
 interface FavoriteButtonProps {
   isFavorite: boolean;
-  onClick: () => void;
+  onClick: (e: React.MouseEvent) => void;
+  loading?: boolean;
   className?: string;
   size?: 'sm' | 'md' | 'lg';
-  loading?: boolean;
+  showText?: boolean;
 }
 
 const FavoriteButton: React.FC<FavoriteButtonProps> = ({
   isFavorite,
   onClick,
+  loading = false,
   className = '',
   size = 'md',
-  loading = false
+  showText = false
 }) => {
-  const sizeClasses = {
+  const heartSizes = {
     sm: 'h-4 w-4',
     md: 'h-5 w-5',
     lg: 'h-6 w-6'
   };
 
-  const buttonSizeClasses = {
-    sm: 'p-1',
-    md: 'p-2',
-    lg: 'p-3'
-  };
-
   return (
-    <button
+    <Button
+      variant={isFavorite ? 'primary' : 'outline'}
+      size={size}
       onClick={onClick}
-      disabled={loading}
-      className={`${buttonSizeClasses[size]} rounded-full transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
-      title={isFavorite ? 'Удалить из избранного' : 'Добавить в избранное'}
+      loading={loading}
+      className={cn(
+        'transition-all duration-200',
+        isFavorite && 'bg-red-500 hover:bg-red-600 border-red-500 text-white',
+        !isFavorite && 'border-gray-300 hover:border-red-300 text-gray-600 hover:text-red-500',
+        className
+      )}
+      leftIcon={
+        <Heart 
+          className={cn(
+            heartSizes[size],
+            isFavorite ? 'fill-current' : '',
+            'transition-all duration-200'
+          )} 
+        />
+      }
     >
-      <Heart 
-        className={`${sizeClasses[size]} transition-colors ${
-          isFavorite 
-            ? 'text-red-500 fill-red-500' 
-            : 'text-gray-400 hover:text-red-500'
-        } ${loading ? 'animate-pulse' : ''}`}
-      />
-    </button>
+      {showText && (isFavorite ? 'В избранном' : 'В избранное')}
+    </Button>
   );
 };
 
