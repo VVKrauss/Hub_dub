@@ -8,6 +8,15 @@ import { syncUserRegistration } from '../../utils/registrationSync';
 import Modal from '../ui/Modal';
 import { EventRegistrations } from '../../pages/admin/constants';
 
+// Типы для виджета Oblakkarte
+declare global {
+  interface Window {
+    OblakWidget?: {
+      open: (options: { eventId: string; lang: string }) => void;
+    };
+  }
+}
+
 // Обновленный тип пропсов для RegistrationModal
 type RegistrationModalProps = {
   isOpen: boolean;
@@ -23,6 +32,7 @@ type RegistrationModalProps = {
     payment_link?: string;
     payment_widget_id?: string;
     widget_chooser?: boolean;
+    oblakkarte_data_event_id?: string; // Добавляем поле для ID события Oblakkarte
     couple_discount?: number;
     child_half_price?: boolean;
     age_category: string; // Используем возрастную категорию вместо adults_only
@@ -63,6 +73,24 @@ const RegistrationModal = ({ isOpen, onClose, event }: RegistrationModalProps) =
       }));
     }
   }, [isOpen, currentUser]);
+
+  // Загружаем скрипт виджета Oblakkarte при открытии модального окна
+  useEffect(() => {
+    if (isOpen && event.widget_chooser && event.oblakkarte_data_event_id) {
+      // Проверяем, не загружен ли уже скрипт
+      if (document.querySelector('script[src="https://widget.oblakkarte.rs/widget.js"]')) {
+        return;
+      }
+
+      // Создаем и загружаем скрипт виджета
+      const script = document.createElement('script');
+      script.src = 'https://widget.oblakkarte.rs/widget.js';
+      script.async = true;
+      script.setAttribute('data-organizer-public-token', 'Yi0idjZg');
+      
+      document.head.appendChild(script);
+    }
+  }, [isOpen, event.widget_chooser, event.oblakkarte_data_event_id]);
 
   const isFreeOrDonation = event.payment_type === 'free' || event.payment_type === 'donation';
   
@@ -164,8 +192,29 @@ const RegistrationModal = ({ isOpen, onClose, event }: RegistrationModalProps) =
     return details;
   };
 
-  const generateOptions = (max: number, start: number = 0) => {
-    return Array.from({ length: max + 1 - start }, (_, i) => start + i);
+  // Функция для открытия платежного виджета или ссылки
+  const handlePaymentRedirect = () => {
+    if (event.widget_chooser && event.oblakkarte_data_event_id) {
+      // Для виджета создаем программный клик по элементу с data-oblak-widget
+      const widgetButton = document.querySelector(`[data-event-id="${event.oblakkarte_data_event_id}"]`);
+      if (widgetButton) {
+        (widgetButton as HTMLElement).click();
+      } else {
+        // Fallback: открываем виджет программно через глобальный объект
+        if (window.OblakWidget) {
+          window.OblakWidget.open({
+            eventId: event.oblakkarte_data_event_id,
+            lang: 'ru'
+          });
+        } else {
+          console.error('Виджет Oblakkarte не загружен');
+          toast.error('Ошибка загрузки платежного виджета');
+        }
+      }
+    } else if (event.payment_link) {
+      // Для обычной ссылки
+      window.open(event.payment_link, '_blank');
+    }
   };
 
   const resetForm = () => {
@@ -235,8 +284,12 @@ const RegistrationModal = ({ isOpen, onClose, event }: RegistrationModalProps) =
       setRegistrationSuccess(true);
       toast.success('Регистрация прошла успешно!');
 
-      if (event.payment_type === 'paid' && event.payment_link) {
-        window.open(event.payment_link, '_blank');
+      // Обработка оплаты после успешной регистрации
+      if (event.payment_type === 'cost') {
+        // Небольшая задержка чтобы пользователь увидел сообщение об успехе
+        setTimeout(() => {
+          handlePaymentRedirect();
+        }, 1000);
       }
 
     } catch (error) {
@@ -302,12 +355,40 @@ const RegistrationModal = ({ isOpen, onClose, event }: RegistrationModalProps) =
                 </div>
               </div>
 
-              <button
-                onClick={onClose}
-                className="w-full bg-primary-600 text-white py-2 px-4 rounded-lg hover:bg-primary-700 transition-colors"
-              >
-                Закрыть
-              </button>
+              {/* Кнопки для оплаты или закрытия */}
+              <div className="space-y-3">
+                {event.payment_type === 'cost' && (
+                  <>
+                    {event.widget_chooser && event.oblakkarte_data_event_id ? (
+                      // Скрытая кнопка для виджета (будет программно активирована)
+                      <a
+                        href="#"
+                        data-oblak-widget
+                        data-event-id={event.oblakkarte_data_event_id}
+                        data-lang="ru"
+                        style={{ display: 'none' }}
+                        onClick={(e) => e.preventDefault()}
+                      >
+                        Widget Button
+                      </a>
+                    ) : null}
+                    
+                    <button
+                      onClick={handlePaymentRedirect}
+                      className="w-full bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 transition-colors font-medium"
+                    >
+                      {event.widget_chooser ? 'Открыть виджет оплаты' : 'Перейти к оплате'}
+                    </button>
+                  </>
+                )}
+                
+                <button
+                  onClick={onClose}
+                  className="w-full bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 py-2 px-4 rounded-lg hover:bg-gray-400 dark:hover:bg-gray-500 transition-colors"
+                >
+                  {event.payment_type === 'cost' ? 'Оплачу позже' : 'Закрыть'}
+                </button>
+              </div>
             </div>
           </>
         ) : (
