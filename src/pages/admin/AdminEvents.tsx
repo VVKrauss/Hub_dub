@@ -384,35 +384,50 @@ const AdminEvents = () => {
         </div>
 
         {/* Массовые действия */}
-        {events.length > 0 && (
-          <div className="mb-8 flex items-center gap-4 p-4 bg-white dark:bg-dark-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700">
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={selectedEvents.length > 0 && selectedEvents.length === filteredEvents.length}
-                onChange={toggleAllEvents}
-                onClick={toggleAllEvents}
-                className="form-checkbox h-5 w-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-dark-600 dark:bg-dark-700 dark:checked:bg-primary-600"
-              />
-              <span className="font-medium text-gray-700 dark:text-gray-300">Выбрать все</span>
-            </label>
-            
-            {selectedEvents.length > 0 && (
-              <>
-                <span className="text-gray-600 dark:text-gray-400 px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-full text-sm">
-                  Выбрано: {selectedEvents.length}
-                </span>
-                <button
-                  onClick={handleDeleteSelected}
-                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Удалить выбранные
-                </button>
-              </>
-            )}
-          </div>
-        )}
+        {selectedEvents.length > 0 && (
+  <div className="mb-8 p-4 bg-white dark:bg-dark-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-600">
+    <div className="flex flex-wrap items-center justify-between gap-4">
+      <span className="text-gray-700 dark:text-gray-300 font-medium">
+        Выбрано: {selectedEvents.length} мероприятий
+      </span>
+      <div className="flex flex-wrap gap-3">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={clearSelection}
+          leftIcon={<X className="h-4 w-4" />}
+        >
+          Отменить выбор
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => handleBulkStatusChange('draft')}
+          leftIcon={<Archive className="h-4 w-4" />}
+        >
+          В черновики
+        </Button>
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={() => handleBulkStatusChange('active')}
+          leftIcon={<CheckCircle className="h-4 w-4" />}
+        >
+          Активировать
+        </Button>
+        <Button
+          variant="danger"
+          size="sm"
+          onClick={() => setShowBulkDeleteModal(true)}
+          leftIcon={<Trash2 className="h-4 w-4" />}
+        >
+          Удалить
+        </Button>
+      </div>
+    </div>
+  </div>
+)}
+
 
         {/* Контент */}
         {loading ? (
