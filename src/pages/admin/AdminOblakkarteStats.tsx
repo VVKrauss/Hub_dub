@@ -1,6 +1,5 @@
 // src/pages/admin/AdminOblakkarteStats.tsx
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
   Calendar, 
   MapPin, 
@@ -17,6 +16,31 @@ import {
   Activity
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+
+// Простые UI компоненты для этой страницы
+const Card = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
+  <div className={`bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 ${className}`}>
+    {children}
+  </div>
+);
+
+const CardHeader = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
+  <div className={`p-6 pb-4 ${className}`}>
+    {children}
+  </div>
+);
+
+const CardTitle = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
+  <h3 className={`text-lg font-semibold text-gray-900 dark:text-white ${className}`}>
+    {children}
+  </h3>
+);
+
+const CardContent = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
+  <div className={`p-6 pt-0 ${className}`}>
+    {children}
+  </div>
+);
 
 interface OblakkarteEvent {
   uuid: string;
@@ -97,23 +121,44 @@ const AdminOblakkarteStats: React.FC = () => {
       setLoading(true);
       setError(null);
       
-      // Импортируем API
-      const { oblakkarteApi } = await import('../../lib/oblakkarteApi');
+      // Проверяем есть ли API ключ
+      const apiKey = import.meta.env.VITE_OBLAKARTE_API_KEY;
       
-      try {
-        // Пытаемся получить реальные данные
-        const data = await oblakkarteApi.getEvents(1, 50);
-        setEvents(data.data);
-        calculateStats(data.data);
-        setLastUpdated(new Date());
-        return;
-      } catch (apiError) {
-        console.warn('Failed to fetch real data, using mock data:', apiError);
-        setError(`Ошибка API: ${apiError instanceof Error ? apiError.message : 'Неизвестная ошибка'}`);
-        // Если API недоступен, используем моковые данные
+      if (apiKey) {
+        try {
+          // Пытаемся получить реальные данные
+          const url = new URL('https://tic.rs/api/organizer/v1/events');
+          url.searchParams.append('page', '1');
+          url.searchParams.append('per_page', '50');
+
+          const response = await fetch(url.toString(), {
+            method: 'GET',
+            headers: {
+              'X-Api-Key': apiKey,
+              'X-Language': 'sr',
+              'Accept': 'application/json',
+              'Content-Type': 'application/json'
+            }
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            setEvents(data.data);
+            calculateStats(data.data);
+            setLastUpdated(new Date());
+            return;
+          } else {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+        } catch (apiError) {
+          console.warn('Failed to fetch real data:', apiError);
+          setError(`Ошибка API: ${apiError instanceof Error ? apiError.message : 'Неизвестная ошибка'}`);
+        }
+      } else {
+        setError('API ключ не настроен. Добавьте VITE_OBLAKARTE_API_KEY в переменные окружения.');
       }
       
-      // Моковые данные для демонстрации
+      // Используем моковые данные для демонстрации
       const mockData: OblakkarteResponse = {
         "data": [
           {
@@ -247,9 +292,9 @@ const AdminOblakkarteStats: React.FC = () => {
       setLastUpdated(new Date());
       
     } catch (error) {
-      console.error('Error fetching Oblakkarte data:', error);
+      console.error('Error in fetchOblakkarteData:', error);
       setError(`Ошибка загрузки данных: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
-      toast.error('Не удалось загрузить данные с Oblakkarte');
+      toast.error('Не удалось загрузить данные');
     } finally {
       setLoading(false);
     }
@@ -604,4 +649,4 @@ const AdminOblakkarteStats: React.FC = () => {
   );
 };
 
-export default AdminOblakkarteStats;    
+export default AdminOblakkarteStats;
