@@ -481,6 +481,8 @@ const CreateEditEventPage = () => {
     
     return eventData;
   };
+
+  
   // src/pages/admin/CreateEditEventPage.tsx - Готовая часть 4
 
   // Отправка формы
