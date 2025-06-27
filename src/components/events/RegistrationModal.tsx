@@ -1,5 +1,15 @@
 import { useState, useEffect } from 'react';
-import { Mail, Phone, User, AlertCircle, CheckCircle, X } from 'lucide-react';
+import { Mail,
+        Phone, 
+        User, 
+        AlertCircle, 
+        CheckCircle, 
+        X, 
+        Calendar, 
+        Clock, 
+        MapPin, 
+        CreditCard,
+       } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { formatRussianDate, formatTimeFromTimestamp } from '../../utils/dateTimeUtils';
 import { supabase } from '../../lib/supabase';
