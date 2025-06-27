@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { X } from 'lucide-react';
-import Modal from '../ui/Modal';
+import { Modal } from '../../shared/ui/Modal/Modal';
 
 type PaymentWidgetModalProps = {
   isOpen: boolean;
@@ -32,8 +31,20 @@ const PaymentWidgetModal = ({ isOpen, onClose, widgetId }: PaymentWidgetModalPro
       onClose={onClose}
       title="Оплата билета"
       size="lg"
+      showCloseButton={true}
+      closeOnOverlayClick={false}
+      closeOnEsc={true}
     >
-      <div ref={containerRef} className="p-6" />
+      <div className="min-h-[400px] flex items-center justify-center">
+        <div ref={containerRef} className="w-full" />
+        {!widgetId && (
+          <div className="text-center">
+            <p className="text-gray-500 dark:text-gray-400">
+              Виджет оплаты не настроен
+            </p>
+          </div>
+        )}
+      </div>
     </Modal>
   );
 };
