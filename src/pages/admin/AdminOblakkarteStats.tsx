@@ -97,21 +97,22 @@ const AdminOblakkarteStats: React.FC = () => {
       setLoading(true);
       setError(null);
       
-      // В реальном приложении здесь будет вызов к вашему API
-      const response = await fetch('/api/oblakkarte/events', {
-        headers: {
-          'X-Api-Key': process.env.REACT_APP_OBLAKKARTE_API_KEY || '',
-          'X-Language': 'sr'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data: OblakkarteResponse = await response.json();
+      // Импортируем API
+      const { oblakkarteApi } = await import('../../../lib/oblakkarteApi');
       
-      // Временно используем моковые данные для демонстрации
+      try {
+        // Пытаемся получить реальные данные
+        const data = await oblakkarteApi.getEvents(1, 50);
+        setEvents(data.data);
+        calculateStats(data.data);
+        setLastUpdated(new Date());
+        return;
+      } catch (apiError) {
+        console.warn('Failed to fetch real data, using mock data:', apiError);
+        // Если API недоступен, используем моковые данные
+      }
+      
+      // Моковые данные для демонстрации
       const mockData: OblakkarteResponse = {
         "data": [
           {
