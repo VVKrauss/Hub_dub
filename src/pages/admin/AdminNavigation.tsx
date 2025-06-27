@@ -550,3 +550,113 @@ const AdminNavigation = () => {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Фон
                   </label>
+                  <select
+                    value={topBarSettings.backgroundColor}
+                    onChange={(e) => setTopBarSettings(prev => ({ 
+                      ...prev, 
+                      backgroundColor: e.target.value as TopBarSettings['backgroundColor'] 
+                    }))}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  >
+                    <option value="white">Белый</option>
+                    <option value="transparent">Прозрачный</option>
+                    <option value="blur">Размытый</option>
+                  </select>
+                </div>
+
+                {/* Checkboxes */}
+                <div className="space-y-3">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={topBarSettings.showBorder}
+                      onChange={(e) => setTopBarSettings(prev => ({ 
+                        ...prev, 
+                        showBorder: e.target.checked 
+                      }))}
+                      className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Показать границу</span>
+                  </label>
+
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={topBarSettings.showShadow}
+                      onChange={(e) => setTopBarSettings(prev => ({ 
+                        ...prev, 
+                        showShadow: e.target.checked 
+                      }))}
+                      className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Показать тень</span>
+                  </label>
+
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={topBarSettings.stickyHeader}
+                      onChange={(e) => setTopBarSettings(prev => ({ 
+                        ...prev, 
+                        stickyHeader: e.target.checked 
+                      }))}
+                      className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Закрепить вверху</span>
+                  </label>
+
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={topBarSettings.showIcons}
+                      onChange={(e) => setTopBarSettings(prev => ({ 
+                        ...prev, 
+                        showIcons: e.target.checked 
+                      }))}
+                      className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Показать иконки</span>
+                  </label>
+
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={topBarSettings.mobileCollapse}
+                      onChange={(e) => setTopBarSettings(prev => ({ 
+                        ...prev, 
+                        mobileCollapse: e.target.checked 
+                      }))}
+                      className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Сворачивать на мобильных</span>
+                  </label>
+                </div>
+
+                {/* Max Width */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Максимальная ширина
+                  </label>
+                  <select
+                    value={topBarSettings.maxWidth}
+                    onChange={(e) => setTopBarSettings(prev => ({ 
+                      ...prev, 
+                      maxWidth: e.target.value as TopBarSettings['maxWidth'] 
+                    }))}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  >
+                    <option value="container">Контейнер</option>
+                    <option value="full">Полная ширина</option>
+                    <option value="screen-xl">Очень широкий</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default AdminNavigation;
