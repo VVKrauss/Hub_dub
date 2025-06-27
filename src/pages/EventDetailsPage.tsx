@@ -640,7 +640,7 @@ const EventDetailsPage = () => {
     widget_chooser: event.widget_chooser,
     couple_discount: event.couple_discount,
     child_half_price: event.child_half_price,
-    age_category: event.age_category, // Передаем возрастную категорию вместо adults_only
+    age_category: event.age_category,
     registrations: event.registrations
   }}
 />
