@@ -236,6 +236,11 @@ const RegistrationModal = ({ isOpen, onClose, event }: RegistrationModalProps) =
     }
   }, [isOpen]);
 
+  // Helper function to generate options for select elements
+  const generateOptions = (max: number, start: number = 0) => {
+    return Array.from({ length: max - start + 1 }, (_, i) => start + i);
+  };
+
   // Обновленная функция отправки формы
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -257,18 +262,6 @@ const RegistrationModal = ({ isOpen, onClose, event }: RegistrationModalProps) =
         status: true,
         created_at: new Date().toISOString()
       };
-
-      const { data, error } = await supabase
-        .from('event_registrations')
-        .insert({
-          event_id: event.id,
-          user_id: currentUser?.id || null,
-          ...registrationData
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
 
       const { data, error } = await supabase
         .from('event_registrations')
@@ -577,4 +570,4 @@ const RegistrationModal = ({ isOpen, onClose, event }: RegistrationModalProps) =
   );
 };
 
-export default RegistrationModal; 
+export default RegistrationModal;
