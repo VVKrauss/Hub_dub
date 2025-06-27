@@ -612,8 +612,9 @@ const CreateEditEventPage = () => {
           ))}
         </div>
       </div>
-
-  // src/pages/admin/CreateEditEventPage.tsx - Часть 5
+      
+      
+      // src/pages/admin/CreateEditEventPage.tsx - Часть 5
 
       {/* Основная форма */}
       <form onSubmit={handleSubmit} className="space-y-6">
