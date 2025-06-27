@@ -55,22 +55,20 @@ const AdminLayout = () => {
     return () => window.removeEventListener('resize', checkScreenSize);
   }, []);
 
-  const navItems = [
-    // Основные разделы
-    { to: '/admin', icon: LayoutDashboard, label: 'Главная страница', shortLabel: 'Главная' },
-    { to: '/admin/events', icon: Calendar, label: 'Мероприятия', shortLabel: 'События' },
-    { to: '/admin/speakers', icon: Users, label: 'Спикеры', shortLabel: 'Спикеры' },
-    { to: '/admin/attendance', icon: Users, label: 'Посещения', shortLabel: 'Посещения' },
-    
-    // Дополнительные разделы
-    { to: '/admin/rent', icon: Building2, label: 'Аренда', shortLabel: 'Аренда' },
-    { to: '/admin/coworking', icon: Briefcase, label: 'Коворкинг', shortLabel: 'Коворк' },
-    { to: '/admin/about', icon: Info, label: 'О нас', shortLabel: 'О нас' },
-    { to: '/admin/navigation', icon: Menu, label: 'Навигация', shortLabel: 'Навиг.' },
-    { to: '/admin/calendar', icon: Calendar, label: 'Календарь', shortLabel: 'Календ.' },
-    { to: '/admin/event-statistics', icon: TrendingUp, label: 'Статистика мероприятий', shortLabel: 'Стат. мер.' },
-    { to: '/admin/export', icon: Download, label: 'Экспорт данных', shortLabel: 'Экспорт' }
-  ];
+ const navItems = [
+  { to: '/admin', icon: LayoutDashboard, label: 'Главная страница', shortLabel: 'Главная' },
+  { to: '/admin/events', icon: Calendar, label: 'Мероприятия', shortLabel: 'События' },
+  { to: '/admin/speakers', icon: Users, label: 'Спикеры', shortLabel: 'Спикеры' },
+  { to: '/admin/attendance', icon: Camera, label: 'Посещения', shortLabel: 'QR-код' },
+  { to: '/admin/oblakkarte-stats', icon: Ticket, label: 'OblaKarte статистика', shortLabel: 'OblaKarte' },
+  { to: '/admin/rent', icon: Building2, label: 'Аренда', shortLabel: 'Аренда' },
+  { to: '/admin/coworking', icon: Briefcase, label: 'Коворкинг', shortLabel: 'Коворк' },
+  { to: '/admin/about', icon: Info, label: 'О нас', shortLabel: 'О нас' },
+  { to: '/admin/navigation', icon: Menu, label: 'Навигация', shortLabel: 'Навиг.' },
+  { to: '/admin/calendar', icon: Calendar, label: 'Календарь', shortLabel: 'Календ.' },
+  { to: '/admin/event-statistics', icon: TrendingUp, label: 'Статистика мероприятий', shortLabel: 'Стат. мер.' },
+  { to: '/admin/export', icon: Download, label: 'Экспорт', shortLabel: 'Экспорт' }
+];
 
   const handleLogout = async () => {
     try {
