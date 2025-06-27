@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import Layout from '../components/layout/Layout';
 import PageHeader from '../components/ui/PageHeader';
-import Modal from '../components/ui/Modal'; // Предполагается, что у вас есть компонент Modal
+import { Modal } from '../shared/ui/Modal/Modal';
+import { Button } from '../shared/ui/Button/Button';
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
