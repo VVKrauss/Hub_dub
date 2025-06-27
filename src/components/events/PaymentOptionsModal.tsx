@@ -33,67 +33,38 @@ const PaymentOptionsModal = ({
   const [isWidgetLoading, setIsWidgetLoading] = useState(false);
   const [isWidgetReady, setIsWidgetReady] = useState(false);
 
-  // Загружаем скрипт виджета один раз при монтировании компонента
+  // Проверяем доступность виджета при открытии модального окна
   useEffect(() => {
     if (!isOpen) return;
     
-    // Проверяем, не загружен ли уже скрипт и не доступен ли уже виджет
+    // Проверяем, не загружен ли уже виджет и не доступен ли уже
     if (window.OblakWidget) {
       setIsWidgetReady(true);
       return;
     }
 
-    const existingScript = document.querySelector('script[src="https://widget.oblakkarte.rs/widget.js"]');
-    if (existingScript) {
-      // Если скрипт уже существует, проверяем доступность виджета
-      checkWidgetAvailability();
-      return;
-    }
+    // Проверяем, загружен ли скрипт
+    const checkWidgetAvailability = () => {
+      let attempts = 0;
+      const maxAttempts = 50; // Максимум 5 секунд (50 * 100ms)
+      
+      const checkInterval = setInterval(() => {
+        attempts++;
+        
+        if (window.OblakWidget) {
+          clearInterval(checkInterval);
+          setIsWidgetReady(true);
+          setIsWidgetLoading(false);
+        } else if (attempts >= maxAttempts) {
+          clearInterval(checkInterval);
+          setIsWidgetLoading(false);
+          console.error('Не удалось загрузить виджет Oblakkarte после нескольких попыток');
+        }
+      }, 100);
+    };
 
-    // Загружаем скрипт только если он нужен
-    if (paymentType === 'widget' && oblakkarteDataEventId) {
-      setIsWidgetLoading(true);
-      
-      // Создаем и загружаем скрипт виджета
-      const script = document.createElement('script');
-      script.src = 'https://widget.oblakkarte.rs/widget.js';
-      script.async = true;
-      script.setAttribute('data-organizer-public-token', 'Yi0idjZg');
-      
-      // Обработчик успешной загрузки скрипта
-      script.onload = () => {
-        checkWidgetAvailability();
-      };
-
-      // Обработчик ошибки загрузки
-      script.onerror = () => {
-        console.error('Не удалось загрузить скрипт виджета Oblakkarte');
-        setIsWidgetLoading(false);
-      };
-      
-      document.head.appendChild(script);
-    }
-  }, [isOpen, paymentType, oblakkarteDataEventId]);
-
-  // Функция для проверки доступности виджета
-  const checkWidgetAvailability = () => {
-    let attempts = 0;
-    const maxAttempts = 50; // Максимум 5 секунд (50 * 100ms)
-    
-    const checkInterval = setInterval(() => {
-      attempts++;
-      
-      if (window.OblakWidget) {
-        clearInterval(checkInterval);
-        setIsWidgetReady(true);
-        setIsWidgetLoading(false);
-      } else if (attempts >= maxAttempts) {
-        clearInterval(checkInterval);
-        setIsWidgetLoading(false);
-        console.error('Не удалось загрузить виджет Oblakkarte после нескольких попыток');
-      }
-    }, 100);
-  };
+    checkWidgetAvailability();
+  }, [isOpen]);
 
   const handleOnlinePayment = () => {
     if (paymentType === 'widget' && oblakkarteDataEventId) {

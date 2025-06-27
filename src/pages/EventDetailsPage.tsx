@@ -185,7 +185,7 @@ const EventDetailsPage = () => {
     try {
       setLoading(true);
       
-      // Получаем событие с временным слотом
+      // Получаем событие с их временными слотами
       const { data: eventData, error: eventError } = await supabase
         .from('events')
         .select(`
@@ -465,7 +465,7 @@ const EventDetailsPage = () => {
                               )}
                               <div className={`${item.image_url ? 'md:w-2/3' : 'w-full'}`}>
                                 <div className="flex flex-wrap items-center gap-4 mb-3">
-                                  <span className="text-sm font-medium px-3 py-1 bg-primary-100 dark:bg-primary-900/50 text-primary-800 dark:text-primary-200 rounded-full">
+                                  <span className="text-sm font-medium px-3 py-1.5 rounded-full bg-primary-100 dark:bg-primary-900/50 text-primary-800 dark:text-primary-200">
                                     {formatTimeFromTimestamp(item.start_time)} - {formatTimeFromTimestamp(item.end_time)}
                                   </span>
                                 </div>
