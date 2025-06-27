@@ -78,8 +78,7 @@ function App() {
           <Route path="event-statistics" element={<AdminEventStatistics />} />
           <Route path="attendance" element={<AdminAttendance />} />
           <Route path="oblakkarte-stats" element={<AdminOblaKarteStats />} />
-          <Route path="oblakkarte-stats" element={<AdminOblaKarteStats />} />
-        </Route>
+                  </Route>
 
         {/* 404 route */}
         <Route path="*" element={<NotFoundPage />} />
