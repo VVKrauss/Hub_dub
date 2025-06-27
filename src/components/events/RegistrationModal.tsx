@@ -537,7 +537,7 @@ const RegistrationModal = ({ isOpen, onClose, event }: RegistrationModalProps) =
                         <span>{calculateTotal()} {event.currency}</span>
                       </div>
                     </div>
-                  </div>
+                  </div> 
                 </div>
               )}
 
