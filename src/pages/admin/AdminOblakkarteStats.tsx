@@ -18,7 +18,58 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-// Простые UI компоненты для этой страницы
+// Интерфейсы для данных билетов
+interface TicketData {
+  purchase_date: string;
+  event: {
+    uuid: string;
+    name: string;
+    date: string;
+  };
+  customer: {
+    name: string;
+    email: string;
+    phone: string;
+  };
+  promocode: string | null;
+  price_paid: {
+    amount: number;
+    currency: {
+      id: number;
+      code: string;
+    };
+  };
+  utm: {
+    source: string | null;
+    medium: string | null;
+    campaign: string | null;
+    content: string | null;
+    term: string | null;
+  };
+  info: {
+    device_type: string;
+    interface_language: string;
+    country_code: string;
+  };
+}
+
+interface TicketsResponse {
+  data: TicketData[];
+  links: {
+    first: string;
+    last: string;
+    prev: string | null;
+    next: string | null;
+  };
+  meta: {
+    current_page: number;
+    from: number;
+    last_page: number;
+    per_page: number;
+    to: number;
+    total: number;
+  };
+}
 const Card = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
   <div className={`bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 ${className}`}>
     {children}
@@ -117,7 +168,7 @@ const AdminOblakkarteStats: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<OblakkarteEvent | null>(null);
-  const [eventDetails, setEventDetails] = useState<any>(null);
+  const [eventDetails, setEventDetails] = useState<TicketsResponse | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
 
   const fetchOblakkarteData = async () => {
@@ -363,7 +414,7 @@ const AdminOblakkarteStats: React.FC = () => {
       });
 
       if (ticketsResponse.ok) {
-        const ticketsData = await ticketsResponse.json();
+        const ticketsData: TicketsResponse = await ticketsResponse.json();
         setEventDetails(ticketsData);
       } else {
         throw new Error(`Ошибка загрузки билетов: ${ticketsResponse.status}`);
@@ -373,48 +424,124 @@ const AdminOblakkarteStats: React.FC = () => {
       console.error('Error fetching event details:', error);
       toast.error('Не удалось загрузить детальную информацию о мероприятии');
       // Устанавливаем моковые данные для демонстрации
-      setEventDetails({
+      const mockTicketsData: TicketsResponse = {
         data: [
           {
-            id: 1,
-            buyer_name: "Иван Иванов",
-            buyer_email: "ivan@example.com",
-            buyer_phone: "+7 900 123-45-67",
-            ticket_type: "Стандартный",
-            price: 1500,
-            currency: "RUB",
-            purchase_date: "2025-06-20T14:30:00Z",
-            status: "confirmed"
+            purchase_date: "2025-06-27T04:34:43+02:00",
+            event: {
+              uuid: eventUuid,
+              name: "Тестовое мероприятие",
+              date: "2026-01-31T15:00:00+01:00"
+            },
+            customer: {
+              name: "Иван Иванов",
+              email: "ivan@example.com",
+              phone: "+7 900 123-45-67"
+            },
+            promocode: null,
+            price_paid: {
+              amount: 1500,
+              currency: {
+                id: 1,
+                code: "RUB"
+              }
+            },
+            utm: {
+              source: null,
+              medium: null,
+              campaign: null,
+              content: null,
+              term: null
+            },
+            info: {
+              device_type: "desktop",
+              interface_language: "ru",
+              country_code: "RU"
+            }
           },
           {
-            id: 2,
-            buyer_name: "Мария Петрова", 
-            buyer_email: "maria@example.com",
-            buyer_phone: "+7 900 987-65-43",
-            ticket_type: "VIP",
-            price: 3000,
-            currency: "RUB",
-            purchase_date: "2025-06-21T10:15:00Z",
-            status: "confirmed"
+            purchase_date: "2025-06-25T01:07:49+02:00",
+            event: {
+              uuid: eventUuid,
+              name: "Тестовое мероприятие",
+              date: "2026-01-31T15:00:00+01:00"
+            },
+            customer: {
+              name: "Мария Петрова",
+              email: "maria@example.com",
+              phone: "+7 900 987-65-43"
+            },
+            promocode: "VIP10",
+            price_paid: {
+              amount: 2700,
+              currency: {
+                id: 1,
+                code: "RUB"
+              }
+            },
+            utm: {
+              source: "facebook",
+              medium: "social",
+              campaign: "summer2025",
+              content: null,
+              term: null
+            },
+            info: {
+              device_type: "mobile",
+              interface_language: "ru",
+              country_code: "RU"
+            }
           },
           {
-            id: 3,
-            buyer_name: "Алексей Сидоров",
-            buyer_email: "alex@example.com", 
-            buyer_phone: "+7 900 555-12-34",
-            ticket_type: "Студенческий",
-            price: 500,
-            currency: "RUB",
-            purchase_date: "2025-06-22T16:45:00Z",
-            status: "pending"
+            purchase_date: "2025-06-24T19:15:27+02:00",
+            event: {
+              uuid: eventUuid,
+              name: "Тестовое мероприятие",
+              date: "2026-01-31T15:00:00+01:00"
+            },
+            customer: {
+              name: "Алексей Сидоров",
+              email: "alex@example.com",
+              phone: "+7 900 555-12-34"
+            },
+            promocode: "STUDENT",
+            price_paid: {
+              amount: 750,
+              currency: {
+                id: 1,
+                code: "RUB"
+              }
+            },
+            utm: {
+              source: "google",
+              medium: "cpc",
+              campaign: "education",
+              content: null,
+              term: "билеты мероприятие"
+            },
+            info: {
+              device_type: "desktop",
+              interface_language: "ru",
+              country_code: "RU"
+            }
           }
         ],
+        links: {
+          first: "https://tic.rs/api/organizer/v1/tickets?page=1",
+          last: "https://tic.rs/api/organizer/v1/tickets?page=1",
+          prev: null,
+          next: null
+        },
         meta: {
-          total: 3,
-          per_page: 1000,
-          current_page: 1
+          current_page: 1,
+          from: 1,
+          last_page: 1,
+          per_page: 10,
+          to: 3,
+          total: 3
         }
-      });
+      };
+      setEventDetails(mockTicketsData);
     } finally {
       setLoadingDetails(false);
     }
@@ -807,7 +934,7 @@ const AdminOblakkarteStats: React.FC = () => {
                           <div>
                             <p className="text-sm text-gray-600 dark:text-gray-300">Подтверждено</p>
                             <p className="text-xl font-bold text-green-700 dark:text-green-300">
-                              {eventDetails.data?.filter((ticket: any) => ticket.status === 'confirmed').length || 0}
+                              {eventDetails.data?.length || 0}
                             </p>
                           </div>
                         </div>
@@ -821,9 +948,9 @@ const AdminOblakkarteStats: React.FC = () => {
                             <Clock className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
                           </div>
                           <div>
-                            <p className="text-sm text-gray-600 dark:text-gray-300">В ожидании</p>
+                            <p className="text-sm text-gray-600 dark:text-gray-300">С промокодом</p>
                             <p className="text-xl font-bold text-yellow-700 dark:text-yellow-300">
-                              {eventDetails.data?.filter((ticket: any) => ticket.status === 'pending').length || 0}
+                              {eventDetails.data?.filter(ticket => ticket.promocode).length || 0}
                             </p>
                           </div>
                         </div>
@@ -839,7 +966,7 @@ const AdminOblakkarteStats: React.FC = () => {
                           <div>
                             <p className="text-sm text-gray-600 dark:text-gray-300">Общая выручка</p>
                             <p className="text-xl font-bold text-purple-700 dark:text-purple-300">
-                              {eventDetails.data?.reduce((sum: number, ticket: any) => sum + (ticket.price || 0), 0).toLocaleString() || 0} ₽
+                              {eventDetails.data?.reduce((sum, ticket) => sum + ticket.price_paid.amount, 0).toLocaleString()} {eventDetails.data?.[0]?.price_paid.currency.code || 'RSD'}
                             </p>
                           </div>
                         </div>
@@ -847,36 +974,84 @@ const AdminOblakkarteStats: React.FC = () => {
                     </Card>
                   </div>
 
-                  {/* Статистика по типам билетов */}
+                  {/* Статистика по промокодам */}
                   <Card>
                     <CardHeader>
-                      <CardTitle>Продажи по категориям билетов</CardTitle>
+                      <CardTitle>Продажи по промокодам</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-3">
                         {eventDetails.data && Object.entries(
-                          eventDetails.data.reduce((acc: any, ticket: any) => {
-                            const type = ticket.ticket_type || 'Без категории';
-                            if (!acc[type]) {
-                              acc[type] = { count: 0, revenue: 0 };
+                          eventDetails.data.reduce((acc: any, ticket) => {
+                            const promo = ticket.promocode || 'Без промокода';
+                            if (!acc[promo]) {
+                              acc[promo] = { count: 0, revenue: 0 };
                             }
-                            acc[type].count += 1;
-                            acc[type].revenue += ticket.price || 0;
+                            acc[promo].count += 1;
+                            acc[promo].revenue += ticket.price_paid.amount;
                             return acc;
                           }, {})
-                        ).map(([type, stats]: [string, any]) => (
-                          <div key={type} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                        ).map(([promo, stats]: [string, any]) => (
+                          <div key={promo} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                             <div>
-                              <span className="font-medium text-gray-900 dark:text-white">{type}</span>
+                              <span className="font-medium text-gray-900 dark:text-white">{promo}</span>
                               <p className="text-sm text-gray-600 dark:text-gray-300">{stats.count} билетов</p>
                             </div>
                             <div className="text-right">
                               <span className="font-bold text-gray-900 dark:text-white">
-                                {stats.revenue.toLocaleString()} ₽
+                                {stats.revenue.toLocaleString()} {eventDetails.data?.[0]?.price_paid.currency.code || 'RSD'}
                               </span>
                             </div>
                           </div>
                         ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Статистика по устройствам */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Статистика по устройствам и каналам</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* По устройствам */}
+                        <div>
+                          <h4 className="font-medium mb-3 text-gray-900 dark:text-white">По устройствам</h4>
+                          <div className="space-y-2">
+                            {eventDetails.data && Object.entries(
+                              eventDetails.data.reduce((acc: any, ticket) => {
+                                const device = ticket.info.device_type || 'Неизвестно';
+                                acc[device] = (acc[device] || 0) + 1;
+                                return acc;
+                              }, {})
+                            ).map(([device, count]: [string, any]) => (
+                              <div key={device} className="flex justify-between items-center">
+                                <span className="text-sm text-gray-600 dark:text-gray-300 capitalize">{device}</span>
+                                <span className="font-semibold">{count}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* По UTM источникам */}
+                        <div>
+                          <h4 className="font-medium mb-3 text-gray-900 dark:text-white">Источники трафика</h4>
+                          <div className="space-y-2">
+                            {eventDetails.data && Object.entries(
+                              eventDetails.data.reduce((acc: any, ticket) => {
+                                const source = ticket.utm.source || 'Прямой переход';
+                                acc[source] = (acc[source] || 0) + 1;
+                                return acc;
+                              }, {})
+                            ).map(([source, count]: [string, any]) => (
+                              <div key={source} className="flex justify-between items-center">
+                                <span className="text-sm text-gray-600 dark:text-gray-300">{source}</span>
+                                <span className="font-semibold">{count}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -891,47 +1066,61 @@ const AdminOblakkarteStats: React.FC = () => {
                         <table className="w-full text-sm">
                           <thead>
                             <tr className="border-b border-gray-200 dark:border-gray-700">
-                              <th className="text-left py-3 px-2 font-medium text-gray-700 dark:text-gray-300">Имя</th>
-                              <th className="text-left py-3 px-2 font-medium text-gray-700 dark:text-gray-300">Email</th>
-                              <th className="text-left py-3 px-2 font-medium text-gray-700 dark:text-gray-300">Телефон</th>
-                              <th className="text-left py-3 px-2 font-medium text-gray-700 dark:text-gray-300">Тип билета</th>
+                              <th className="text-left py-3 px-2 font-medium text-gray-700 dark:text-gray-300">Покупатель</th>
+                              <th className="text-left py-3 px-2 font-medium text-gray-700 dark:text-gray-300">Контакты</th>
+                              <th className="text-left py-3 px-2 font-medium text-gray-700 dark:text-gray-300">Промокод</th>
                               <th className="text-center py-3 px-2 font-medium text-gray-700 dark:text-gray-300">Цена</th>
-                              <th className="text-center py-3 px-2 font-medium text-gray-700 dark:text-gray-300">Статус</th>
+                              <th className="text-left py-3 px-2 font-medium text-gray-700 dark:text-gray-300">Устройство</th>
+                              <th className="text-left py-3 px-2 font-medium text-gray-700 dark:text-gray-300">Источник</th>
                               <th className="text-left py-3 px-2 font-medium text-gray-700 dark:text-gray-300">Дата покупки</th>
                             </tr>
                           </thead>
                           <tbody>
-                            {eventDetails.data?.map((ticket: any, index: number) => (
-                              <tr key={ticket.id || index} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                                <td className="py-3 px-2 text-gray-900 dark:text-white">
-                                  {ticket.buyer_name || 'Не указано'}
+                            {eventDetails.data?.map((ticket, index) => (
+                              <tr key={index} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                <td className="py-3 px-2">
+                                  <div>
+                                    <div className="font-medium text-gray-900 dark:text-white">
+                                      {ticket.customer.name}
+                                    </div>
+                                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                                      {ticket.info.country_code || 'Не указано'}
+                                    </div>
+                                  </div>
                                 </td>
-                                <td className="py-3 px-2 text-gray-600 dark:text-gray-300">
-                                  {ticket.buyer_email || 'Не указано'}
+                                <td className="py-3 px-2">
+                                  <div>
+                                    <div className="text-gray-900 dark:text-white text-xs">
+                                      {ticket.customer.email}
+                                    </div>
+                                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                                      {ticket.customer.phone}
+                                    </div>
+                                  </div>
                                 </td>
-                                <td className="py-3 px-2 text-gray-600 dark:text-gray-300">
-                                  {ticket.buyer_phone || 'Не указано'}
-                                </td>
-                                <td className="py-3 px-2 text-gray-600 dark:text-gray-300">
-                                  {ticket.ticket_type || 'Стандартный'}
+                                <td className="py-3 px-2">
+                                  {ticket.promocode ? (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300">
+                                      {ticket.promocode}
+                                    </span>
+                                  ) : (
+                                    <span className="text-gray-500 dark:text-gray-400 text-xs">—</span>
+                                  )}
                                 </td>
                                 <td className="py-3 px-2 text-center font-medium">
-                                  {ticket.price ? `${ticket.price.toLocaleString()} ₽` : 'Бесплатно'}
+                                  {ticket.price_paid.amount.toLocaleString()} {ticket.price_paid.currency.code}
                                 </td>
-                                <td className="py-3 px-2 text-center">
-                                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                                    ticket.status === 'confirmed' 
-                                      ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300'
-                                      : ticket.status === 'pending'
-                                      ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300'
-                                      : 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300'
-                                  }`}>
-                                    {ticket.status === 'confirmed' ? 'Подтверждён' :
-                                     ticket.status === 'pending' ? 'Ожидание' : 'Неизвестно'}
+                                <td className="py-3 px-2">
+                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300 capitalize">
+                                    {ticket.info.device_type}
                                   </span>
                                 </td>
-                                <td className="py-3 px-2 text-gray-600 dark:text-gray-300">
-                                  {ticket.purchase_date ? formatDate(ticket.purchase_date) : 'Не указано'}
+                                <td className="py-3 px-2 text-gray-600 dark:text-gray-300 text-xs">
+                                  {ticket.utm.source || 'Прямой'}
+                                  {ticket.utm.medium && ` / ${ticket.utm.medium}`}
+                                </td>
+                                <td className="py-3 px-2 text-gray-600 dark:text-gray-300 text-xs">
+                                  {formatDate(ticket.purchase_date)}
                                 </td>
                               </tr>
                             ))}
