@@ -1,6 +1,4 @@
 // src/lib/oblakkarteApi.ts
-import { supabase } from './supabase';
-
 export interface OblakkarteEvent {
   uuid: string;
   name: string;
@@ -51,38 +49,20 @@ export interface OblakkarteResponse {
 }
 
 export class OblakkarteApi {
-  private apiKey: string | null = null;
+  private apiKey: string;
 
   constructor() {
-    this.loadApiKey();
-  }
-
-  private async loadApiKey() {
-    try {
-      const { data, error } = await supabase
-        .from('secrets')
-        .select('value')
-        .eq('name', 'OBLAKARTE_API_KEY')
-        .single();
-
-      if (error) {
-        console.error('Error loading Oblakkarte API key:', error);
-        return;
-      }
-
-      this.apiKey = data?.value;
-    } catch (error) {
-      console.error('Failed to load API key:', error);
+    // Используем встроенный secret из Supabase
+    this.apiKey = import.meta.env.VITE_OBLAKARTE_API_KEY || '';
+    
+    if (!this.apiKey) {
+      console.warn('OBLAKARTE_API_KEY не найден в переменных окружения');
     }
   }
 
   async getEvents(page: number = 1, perPage: number = 10, eventUuid?: string): Promise<OblakkarteResponse> {
     if (!this.apiKey) {
-      await this.loadApiKey();
-    }
-
-    if (!this.apiKey) {
-      throw new Error('API ключ Oblakkarte не найден в базе данных');
+      throw new Error('API ключ Oblakkarte не настроен. Проверьте переменные окружения.');
     }
 
     const url = new URL('https://tic.rs/api/organizer/v1/events');
@@ -97,7 +77,7 @@ export class OblakkarteApi {
       method: 'GET',
       headers: {
         'X-Api-Key': this.apiKey,
-        'X-Language': 'sr',
+        'X-Language': 'ru',  // Изменено на русский язык
         'Accept': 'application/json',
         'Content-Type': 'application/json'
       }
@@ -112,11 +92,7 @@ export class OblakkarteApi {
 
   async getTickets(eventUuid: string, page: number = 1, perPage: number = 10) {
     if (!this.apiKey) {
-      await this.loadApiKey();
-    }
-
-    if (!this.apiKey) {
-      throw new Error('API ключ Oblakkarte не найден');
+      throw new Error('API ключ Oblakkarte не настроен');
     }
 
     const url = new URL('https://tic.rs/api/organizer/v1/tickets');
@@ -128,7 +104,7 @@ export class OblakkarteApi {
       method: 'GET',
       headers: {
         'X-Api-Key': this.apiKey,
-        'X-Language': 'sr',
+        'X-Language': 'ru',  // Изменено на русский язык
         'Accept': 'application/json',
         'Content-Type': 'application/json'
       }
