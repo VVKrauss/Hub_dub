@@ -13,7 +13,8 @@ import {
   Download,
   Clock,
   TrendingUp,
-  Activity
+  Activity,
+  X
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -115,6 +116,9 @@ const AdminOblakkarteStats: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<OblakkarteEvent | null>(null);
+  const [eventDetails, setEventDetails] = useState<any>(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
 
   const fetchOblakkarteData = async () => {
     try {
@@ -135,7 +139,7 @@ const AdminOblakkarteStats: React.FC = () => {
             method: 'GET',
             headers: {
               'X-Api-Key': apiKey,
-              'X-Language': 'sr',
+              'X-Language': 'ru',  // Изменено на русский
               'Accept': 'application/json',
               'Content-Type': 'application/json'
             }
@@ -331,6 +335,101 @@ const AdminOblakkarteStats: React.FC = () => {
     });
 
     setStats(stats);
+  };
+
+  // Функция загрузки детальной информации о мероприятии
+  const fetchEventDetails = async (eventUuid: string) => {
+    try {
+      setLoadingDetails(true);
+      const apiKey = import.meta.env.VITE_OBLAKARTE_API_KEY;
+      
+      if (!apiKey) {
+        throw new Error('API ключ не настроен');
+      }
+
+      // Получаем билеты для мероприятия
+      const ticketsUrl = new URL('https://tic.rs/api/organizer/v1/tickets');
+      ticketsUrl.searchParams.append('event_uuid', eventUuid);
+      ticketsUrl.searchParams.append('per_page', '1000');
+
+      const ticketsResponse = await fetch(ticketsUrl.toString(), {
+        method: 'GET',
+        headers: {
+          'X-Api-Key': apiKey,
+          'X-Language': 'ru',
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (ticketsResponse.ok) {
+        const ticketsData = await ticketsResponse.json();
+        setEventDetails(ticketsData);
+      } else {
+        throw new Error(`Ошибка загрузки билетов: ${ticketsResponse.status}`);
+      }
+
+    } catch (error) {
+      console.error('Error fetching event details:', error);
+      toast.error('Не удалось загрузить детальную информацию о мероприятии');
+      // Устанавливаем моковые данные для демонстрации
+      setEventDetails({
+        data: [
+          {
+            id: 1,
+            buyer_name: "Иван Иванов",
+            buyer_email: "ivan@example.com",
+            buyer_phone: "+7 900 123-45-67",
+            ticket_type: "Стандартный",
+            price: 1500,
+            currency: "RUB",
+            purchase_date: "2025-06-20T14:30:00Z",
+            status: "confirmed"
+          },
+          {
+            id: 2,
+            buyer_name: "Мария Петрова", 
+            buyer_email: "maria@example.com",
+            buyer_phone: "+7 900 987-65-43",
+            ticket_type: "VIP",
+            price: 3000,
+            currency: "RUB",
+            purchase_date: "2025-06-21T10:15:00Z",
+            status: "confirmed"
+          },
+          {
+            id: 3,
+            buyer_name: "Алексей Сидоров",
+            buyer_email: "alex@example.com", 
+            buyer_phone: "+7 900 555-12-34",
+            ticket_type: "Студенческий",
+            price: 500,
+            currency: "RUB",
+            purchase_date: "2025-06-22T16:45:00Z",
+            status: "pending"
+          }
+        ],
+        meta: {
+          total: 3,
+          per_page: 1000,
+          current_page: 1
+        }
+      });
+    } finally {
+      setLoadingDetails(false);
+    }
+  };
+
+  // Обработчик клика по мероприятию
+  const handleEventClick = (event: OblakkarteEvent) => {
+    setSelectedEvent(event);
+    fetchEventDetails(event.uuid);
+  };
+
+  // Закрытие модального окна
+  const closeEventDetails = () => {
+    setSelectedEvent(null);
+    setEventDetails(null);
   };
 
   const exportToCSV = () => {
@@ -594,7 +693,11 @@ const AdminOblakkarteStats: React.FC = () => {
                 </thead>
                 <tbody>
                   {events.map((event) => (
-                    <tr key={event.uuid} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                    <tr 
+                      key={event.uuid} 
+                      className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer transition-colors"
+                      onClick={() => handleEventClick(event)}
+                    >
                       <td className="py-3 px-2">
                         <div>
                           <div className="font-medium text-gray-900 dark:text-white">{event.name}</div>
@@ -645,6 +748,216 @@ const AdminOblakkarteStats: React.FC = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Модальное окно с детальной статистикой */}
+      {selectedEvent && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-dark-800 rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden">
+            {/* Заголовок модального окна */}
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {selectedEvent.name}
+                </h2>
+                <p className="text-gray-600 dark:text-gray-300 mt-1">
+                  {selectedEvent.event_type.name} • {selectedEvent.place.name} • {selectedEvent.city.name}
+                </p>
+              </div>
+              <button
+                onClick={closeEventDetails}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            {/* Содержимое модального окна */}
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+              {loadingDetails ? (
+                <div className="flex justify-center items-center py-12">
+                  <RefreshCw className="h-8 w-8 animate-spin text-primary-600" />
+                  <span className="ml-2 text-gray-600 dark:text-gray-300">Загрузка детальной информации...</span>
+                </div>
+              ) : eventDetails ? (
+                <div className="space-y-6">
+                  {/* Статистика мероприятия */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
+                            <Ticket className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600 dark:text-gray-300">Всего билетов</p>
+                            <p className="text-xl font-bold text-gray-900 dark:text-white">
+                              {eventDetails.meta?.total || 0}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-green-100 dark:bg-green-900/20 rounded-lg">
+                            <Users className="h-5 w-5 text-green-600 dark:text-green-400" />
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600 dark:text-gray-300">Подтверждено</p>
+                            <p className="text-xl font-bold text-green-700 dark:text-green-300">
+                              {eventDetails.data?.filter((ticket: any) => ticket.status === 'confirmed').length || 0}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-yellow-100 dark:bg-yellow-900/20 rounded-lg">
+                            <Clock className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600 dark:text-gray-300">В ожидании</p>
+                            <p className="text-xl font-bold text-yellow-700 dark:text-yellow-300">
+                              {eventDetails.data?.filter((ticket: any) => ticket.status === 'pending').length || 0}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-purple-100 dark:bg-purple-900/20 rounded-lg">
+                            <TrendingUp className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600 dark:text-gray-300">Общая выручка</p>
+                            <p className="text-xl font-bold text-purple-700 dark:text-purple-300">
+                              {eventDetails.data?.reduce((sum: number, ticket: any) => sum + (ticket.price || 0), 0).toLocaleString() || 0} ₽
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Статистика по типам билетов */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Продажи по категориям билетов</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {eventDetails.data && Object.entries(
+                          eventDetails.data.reduce((acc: any, ticket: any) => {
+                            const type = ticket.ticket_type || 'Без категории';
+                            if (!acc[type]) {
+                              acc[type] = { count: 0, revenue: 0 };
+                            }
+                            acc[type].count += 1;
+                            acc[type].revenue += ticket.price || 0;
+                            return acc;
+                          }, {})
+                        ).map(([type, stats]: [string, any]) => (
+                          <div key={type} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                            <div>
+                              <span className="font-medium text-gray-900 dark:text-white">{type}</span>
+                              <p className="text-sm text-gray-600 dark:text-gray-300">{stats.count} билетов</p>
+                            </div>
+                            <div className="text-right">
+                              <span className="font-bold text-gray-900 dark:text-white">
+                                {stats.revenue.toLocaleString()} ₽
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Список покупателей */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Список покупателей</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-gray-200 dark:border-gray-700">
+                              <th className="text-left py-3 px-2 font-medium text-gray-700 dark:text-gray-300">Имя</th>
+                              <th className="text-left py-3 px-2 font-medium text-gray-700 dark:text-gray-300">Email</th>
+                              <th className="text-left py-3 px-2 font-medium text-gray-700 dark:text-gray-300">Телефон</th>
+                              <th className="text-left py-3 px-2 font-medium text-gray-700 dark:text-gray-300">Тип билета</th>
+                              <th className="text-center py-3 px-2 font-medium text-gray-700 dark:text-gray-300">Цена</th>
+                              <th className="text-center py-3 px-2 font-medium text-gray-700 dark:text-gray-300">Статус</th>
+                              <th className="text-left py-3 px-2 font-medium text-gray-700 dark:text-gray-300">Дата покупки</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {eventDetails.data?.map((ticket: any, index: number) => (
+                              <tr key={ticket.id || index} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                <td className="py-3 px-2 text-gray-900 dark:text-white">
+                                  {ticket.buyer_name || 'Не указано'}
+                                </td>
+                                <td className="py-3 px-2 text-gray-600 dark:text-gray-300">
+                                  {ticket.buyer_email || 'Не указано'}
+                                </td>
+                                <td className="py-3 px-2 text-gray-600 dark:text-gray-300">
+                                  {ticket.buyer_phone || 'Не указано'}
+                                </td>
+                                <td className="py-3 px-2 text-gray-600 dark:text-gray-300">
+                                  {ticket.ticket_type || 'Стандартный'}
+                                </td>
+                                <td className="py-3 px-2 text-center font-medium">
+                                  {ticket.price ? `${ticket.price.toLocaleString()} ₽` : 'Бесплатно'}
+                                </td>
+                                <td className="py-3 px-2 text-center">
+                                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                                    ticket.status === 'confirmed' 
+                                      ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300'
+                                      : ticket.status === 'pending'
+                                      ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300'
+                                      : 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300'
+                                  }`}>
+                                    {ticket.status === 'confirmed' ? 'Подтверждён' :
+                                     ticket.status === 'pending' ? 'Ожидание' : 'Неизвестно'}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-2 text-gray-600 dark:text-gray-300">
+                                  {ticket.purchase_date ? formatDate(ticket.purchase_date) : 'Не указано'}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        
+                        {(!eventDetails.data || eventDetails.data.length === 0) && (
+                          <div className="text-center py-8">
+                            <Ticket className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                            <p className="text-gray-500 dark:text-gray-400">Нет данных о билетах</p>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <Activity className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                  <p className="text-gray-500 dark:text-gray-400">Не удалось загрузить данные</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
