@@ -78,6 +78,8 @@ function App() {
           <Route path="event-statistics" element={<AdminEventStatistics />} />
           <Route path="attendance" element={<AdminAttendance />} />
           <Route path="oblakkarte-stats" element={<AdminOblaKarteStats />} />
+          <Route path="attendance" element={<AdminAttendance />} />
+          <Route path="oblakkarte-stats" element={<AdminOblaKarteStats />} />
         </Route>
 
         {/* 404 route */}
