@@ -1,8 +1,28 @@
+// src/pages/admin/AdminEventStatistics.tsx - Часть 1 (импорты и начало)
 import React, { useState, useEffect } from 'react';
-import { Calendar, Users, Clock, ChevronDown, Loader2, Star, TrendingUp, Award, BarChart3, DollarSign, Eye, Grid3X3, List, CalendarDays, Gift, CreditCard } from 'lucide-react';
+import { 
+  Calendar, 
+  Users, 
+  Clock, 
+  ChevronDown, 
+  Loader2, 
+  Star, 
+  TrendingUp, 
+  Award, 
+  BarChart3, 
+  DollarSign, 
+  Eye, 
+  Grid3X3, 
+  List, 
+  CalendarDays, 
+  Gift, 
+  CreditCard,
+  Download
+} from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { getSupabaseImageUrl } from '../../utils/imageUtils';
-import { Dialog } from '@headlessui/react';
+import { Button } from '../../shared/ui/Button/Button';
+import { Modal } from '../../shared/ui/Modal/Modal';
 
 type ExportType = 'visitors' | 'full_stats';
 
@@ -134,166 +154,108 @@ const EventCard = ({ event, isPast = false, isCompact = false }: { event: any, i
           </div>
           <div className="text-right ml-4">
             {event.price > 0 ? (
-              <div className="text-right">
-                <div className="flex items-center justify-end gap-1">
-                  <CreditCard className="w-4 h-4 text-primary-600 dark:text-primary-400" />
-                  <span className={`font-bold text-primary-600 dark:text-primary-400 ${isCompact ? 'text-lg' : 'text-xl'}`}>
-                    {event.price.toLocaleString()}
-                  </span>
-                  <span className="text-sm text-gray-500 dark:text-gray-400">
-                    {event.currency || 'RUB'}
-                  </span>
-                </div>
+              <div className="flex items-center gap-1 text-success-600 dark:text-success-400">
+                <CreditCard className="w-3 h-3" />
+                <span className="font-medium text-gray-900 dark:text-white">
+                  {event.price.toLocaleString()} {event.currency || 'RUB'}
+                </span>
               </div>
             ) : (
-              <div className="flex items-center justify-end gap-1">
-                <Gift className={`text-success-600 dark:text-success-400 ${isCompact ? 'w-5 h-5' : 'w-6 h-6'}`} />
-                <span className={`font-bold text-success-600 dark:text-success-400 ${isCompact ? 'text-sm' : 'text-base'}`}>
-                  Бесплатно
-                </span>
+              <div className="flex items-center gap-1">
+                <Gift className="w-3 h-3 text-success-600" />
+                <span className="font-medium text-success-600">Бесплатно</span>
               </div>
             )}
           </div>
         </div>
 
-        <div className={`space-y-${isCompact ? '2' : '4'}`}>
-          <div className="flex items-center text-gray-700 dark:text-gray-300">
-            <div className={`flex items-center justify-center bg-primary-100 dark:bg-primary-900/30 rounded-lg mr-3 ${isCompact ? 'w-6 h-6' : 'w-8 h-8'}`}>
-              <Calendar className={`text-primary-600 dark:text-primary-400 ${isCompact ? 'w-3 h-3' : 'w-4 h-4'}`} />
+        {/* Информация о мероприятии */}
+        <div className="space-y-3 mb-4">
+          <div className="flex items-center text-gray-600 dark:text-gray-300 text-sm">
+            <div className="flex items-center justify-center w-6 h-6 bg-primary-100 dark:bg-primary-900/30 rounded-md mr-2">
+              <Calendar className="w-3 h-3 text-primary-600 dark:text-primary-400" />
             </div>
-            <span className={`font-medium ${isCompact ? 'text-sm' : ''}`}>{formatDate(event.start_at)}</span>
-          </div>
-
-          <div className="flex items-center text-gray-700 dark:text-gray-300">
-            <div className={`flex items-center justify-center bg-primary-100 dark:bg-primary-900/30 rounded-lg mr-3 ${isCompact ? 'w-6 h-6' : 'w-8 h-8'}`}>
-              <Clock className={`text-primary-600 dark:text-primary-400 ${isCompact ? 'w-3 h-3' : 'w-4 h-4'}`} />
-            </div>
-            <span className={`font-medium ${isCompact ? 'text-sm' : ''}`}>
-              {formatTime(event.start_at)} - {formatTime(event.end_at)}
+            <span className="font-medium">
+              {formatDateShort(event.start_at)} в {formatTime(event.start_at)}
             </span>
           </div>
 
-          <div className="flex items-center text-gray-700 dark:text-gray-300">
-            <div className={`flex items-center justify-center bg-primary-100 dark:bg-primary-900/30 rounded-lg mr-3 ${isCompact ? 'w-6 h-6' : 'w-8 h-8'}`}>
-              <Users className={`text-primary-600 dark:text-primary-400 ${isCompact ? 'w-3 h-3' : 'w-4 h-4'}`} />
-            </div>
-            <span className={`font-medium ${isCompact ? 'text-sm' : ''}`}>
-              <span className={getStatusColor()}>{currentRegs}</span> из {maxRegs} участников
-            </span>
-          </div>
-        </div>
-
-        {speakers.length > 0 && !isCompact && (
-          <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-            <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Спикеры:</p>
-            <div className="flex flex-wrap gap-3">
-              {speakers.map((speaker) => {
-                const photoUrl = getSpeakerPhoto(speaker);
-                return (
-                  <div 
-                    key={speaker.id}
-                    className="flex items-center gap-2 bg-gradient-to-r from-primary-50 to-primary-100 dark:from-primary-900/20 dark:to-primary-800/20 text-primary-700 dark:text-primary-300 px-3 py-2 rounded-full text-sm font-medium"
-                  >
-                    {photoUrl ? (
-                      <img 
-                        src={photoUrl} 
-                        alt={speaker.name}
-                        className="w-6 h-6 rounded-full object-cover border-2 border-primary-200 dark:border-primary-600"
-                      />
-                    ) : (
-                      <div className="w-6 h-6 bg-primary-200 dark:bg-primary-600 rounded-full flex items-center justify-center">
-                        <Users className="w-3 h-3 text-primary-600 dark:text-primary-300" />
-                      </div>
-                    )}
-                    <span>{speaker.name || 'Без имени'}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {isPast && (
-          <div className="mt-4">
-            <span className="inline-flex items-center bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-3 py-1 rounded-full text-sm font-medium">
-              <TrendingUp className="w-3 h-3 mr-1" />
-              Завершено
-            </span>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-// Компонент списочного элемента
-const EventListItem = ({ event, isPast = false }: { event: any, isPast?: boolean }) => {
-  const registrations = event.registrations || {};
-  const currentRegs = parseInt(registrations.current || '0') || 0;
-  const maxRegs = parseInt(registrations.max_registrations || registrations.max_regs || '0') || 0;
-
-  return (
-    <div className="bg-white dark:bg-dark-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 hover:border-primary-200 dark:hover:border-primary-600 transition-all duration-200 hover:shadow-md relative overflow-hidden">
-      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary-400 via-primary-500 to-primary-600"></div>
-      
-      <div className="flex items-start justify-between mt-2">
-        <div className="flex items-start space-x-3 flex-1 min-w-0">
-          <div className="flex-shrink-0">
-            <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center">
-              {getEventTypeIcon(event.event_type)}
-            </div>
-          </div>
-          
-          <div className="flex-1 min-w-0">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate mb-1">
-              {event.title && event.title.length > 50 
-                ? `${event.title.substring(0, 50)}...` 
-                : event.title || 'Без названия'}
-            </h3>
-            
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 dark:text-gray-400">
-              <div className="flex items-center">
-                <Calendar className="w-3 h-3 mr-1" />
-                {formatDateShort(event.start_at)}
+          {currentRegs > 0 && (
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center text-gray-600 dark:text-gray-300">
+                <div className="flex items-center justify-center w-6 h-6 bg-primary-100 dark:bg-primary-900/30 rounded-md mr-2">
+                  <Users className="w-3 h-3 text-primary-600 dark:text-primary-400" />
+                </div>
+                <span className="font-medium">
+                  {currentRegs} {maxRegs > 0 ? `/ ${maxRegs}` : ''} участников
+                </span>
               </div>
-              <div className="flex items-center">
-                <Clock className="w-3 h-3 mr-1" />
-                {formatTime(event.start_at)}
-              </div>
-              <div className="flex items-center">
-                <Users className="w-3 h-3 mr-1" />
-                {currentRegs}/{maxRegs}
-              </div>
-              <span className="inline-flex items-center bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 px-2 py-0.5 rounded text-xs font-medium">
-                {getEventTypeLabel(event.event_type)}
-              </span>
-              <div className="flex items-center gap-1">
-                {event.price > 0 ? (
-                  <>
-                    <CreditCard className="w-3 h-3" />
-                    <span className="font-medium text-gray-900 dark:text-white">
-                      {event.price.toLocaleString()} {event.currency || 'RUB'}
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <Gift className="w-3 h-3 text-success-600" />
-                    <span className="font-medium text-success-600">Бесплатно</span>
-                  </>
-                )}
-              </div>
-              {isPast && currentRegs > 0 && (
-                <button className="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium text-xs underline">
-                  Подробнее
-                </button>
+              {maxRegs > 0 && (
+                <span className={`text-xs font-bold ${getStatusColor()}`}>
+                  {Math.round(fillPercentage)}%
+                </span>
               )}
             </div>
-          </div>
+          )}
+
+          {maxRegs > 0 && (
+            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+              <div 
+                className={`h-1.5 rounded-full transition-all duration-300 ${
+                  fillPercentage >= 90 ? 'bg-red-500' :
+                  fillPercentage >= 70 ? 'bg-yellow-500' : 'bg-green-500'
+                }`}
+                style={{ width: `${Math.min(fillPercentage, 100)}%` }}
+              />
+            </div>
+          )}
+
+          {/* Спикеры */}
+          {speakers.length > 0 && (
+            <div className="flex items-center gap-2">
+              <div className="flex -space-x-2">
+                {speakers.slice(0, 3).map((speaker, index) => {
+                  const photo = getSpeakerPhoto(speaker);
+                  return (
+                    <div
+                      key={speaker.id}
+                      className="w-6 h-6 rounded-full border-2 border-white dark:border-gray-700 bg-gray-200 dark:bg-gray-600 flex items-center justify-center overflow-hidden"
+                      title={speaker.name}
+                    >
+                      {photo ? (
+                        <img src={photo} alt={speaker.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <Users className="w-3 h-3 text-gray-400" />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                {speakers.length === 1 ? speakers[0].name : `${speakers.length} спикера`}
+              </span>
+            </div>
+          )}
         </div>
+
+        {/* Дополнительные действия для прошедших мероприятий */}
+        {isPast && currentRegs > 0 && (
+          <div className="pt-3 border-t border-gray-200 dark:border-gray-600">
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs"
+            >
+              Подробнее
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
 };
+
+// src/pages/admin/AdminEventStatistics.tsx - Часть 2 (главный компонент)
 
 // Компонент карточки статистики
 const StatCard = ({ title, value, subtitle, icon: Icon, color = 'primary' }: { title: string, value: string | number, subtitle?: string, icon: any, color?: string }) => {
@@ -329,77 +291,28 @@ const LoadingSpinner = () => (
 // Компонент тумблера переключения вида
 const ViewToggle = ({ isListView, onToggle }: { isListView: boolean, onToggle: (value: boolean) => void }) => (
   <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
-    <button
+    <Button
+      variant={!isListView ? "primary" : "ghost"}
+      size="sm"
       onClick={() => onToggle(false)}
-      className={`p-2 rounded-md transition-all duration-200 ${
-        !isListView 
-          ? 'bg-white dark:bg-dark-700 text-primary-600 dark:text-primary-400 shadow-sm' 
-          : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-      }`}
+      leftIcon={<Grid3X3 className="w-4 h-4" />}
     >
-      <Grid3X3 className="w-4 h-4" />
-    </button>
-    <button
+    </Button>
+    <Button
+      variant={isListView ? "primary" : "ghost"}
+      size="sm"
       onClick={() => onToggle(true)}
-      className={`p-2 rounded-md transition-all duration-200 ${
-        isListView 
-          ? 'bg-white dark:bg-dark-700 text-primary-600 dark:text-primary-400 shadow-sm' 
-          : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-      }`}
+      leftIcon={<List className="w-4 h-4" />}
     >
-      <List className="w-4 h-4" />
-    </button>
+    </Button>
   </div>
 );
 
-// Функция загрузки событий из Supabase
-const loadEventsFromSupabase = async (type: string, offset = 0, limit = 10) => {
-  try {
-    const now = new Date().toISOString();
-    let query = supabase.from('events').select('*');
-
-    if (type === 'nearest') {
-      const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-      query = query
-        .gte('start_at', now)
-        .lte('start_at', nextWeek)
-        .eq('status', 'active')
-        .order('start_at', { ascending: true })
-        .limit(1);
-    } else if (type === 'upcoming') {
-      query = query
-        .gte('start_at', now)
-        .eq('status', 'active')
-        .order('start_at', { ascending: true })
-        .range(offset, offset + limit - 1);
-    } else if (type === 'past') {
-      query = query
-        .or(`start_at.lt.${now},status.eq.past`)
-        .order('start_at', { ascending: false })
-        .range(offset, offset + limit - 1);
-    }
-
-    const { data, error } = await query;
-    if (error) {
-      console.error('Database error:', error);
-      throw error;
-    }
-
-    return {
-      data: (data || []).filter(event => event && event.id),
-      hasMore: (data || []).length === limit
-    };
-  } catch (error) {
-    console.error('Error loading events:', error);
-    return { data: [], hasMore: false };
-  }
-};
-
-// Основной компонент
+// Главный компонент
 const EventsStatistics = () => {
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [isListView, setIsListView] = useState(false);
-  const [timeFilter, setTimeFilter] = useState('all');
+  // Состояния
+  const [activeTab, setActiveTab] = useState<string>('dashboard');
+  const [timeFilter, setTimeFilter] = useState<string>('all');
   const [customDateRange, setCustomDateRange] = useState({ start: '', end: '' });
   const [events, setEvents] = useState({
     nearest: [],
@@ -430,195 +343,107 @@ const EventsStatistics = () => {
   // Состояния для модального окна экспорта
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportType, setExportType] = useState<ExportType>('visitors');
+  const [isListView, setIsListView] = useState(false);
 
-  // Функция экспорта только посетителей
-  const exportVisitors = async () => {
+  // Функция загрузки событий из Supabase
+  const loadEventsFromSupabase = async (type: string, offset: number, limit: number) => {
     try {
-      const registrationsMap = new Map<string, { full_name: string; count: number }>();
-      
-      const eventTypes = ['nearest', 'upcoming', 'past'] as const;
-      
-      for (const type of eventTypes) {
-        for (const event of events[type]) {
-          // Используем поле registrations как JSONB объект
-          const registrations = event.registrations || {};
-          if (registrations.reg_list && Array.isArray(registrations.reg_list)) {
-            registrations.reg_list.forEach((reg: any) => {
-              if (reg.email && reg.full_name) {
-                const email = reg.email.toLowerCase().trim();
-                const current = registrationsMap.get(email);
-                
-                if (current) {
-                  registrationsMap.set(email, {
-                    full_name: current.full_name,
-                    count: current.count + 1
-                  });
-                } else {
-                  registrationsMap.set(email, {
-                    full_name: reg.full_name.trim(),
-                    count: 1
-                  });
-                }
-              }
-            });
-          }
-        }
+      let query = supabase
+        .from('events')
+        .select('*');
+
+      const now = new Date().toISOString();
+
+      if (type === 'nearest') {
+        query = query
+          .gte('start_at', now)
+          .order('start_at', { ascending: true })
+          .limit(1);
+      } else if (type === 'upcoming') {
+        query = query
+          .gte('start_at', now)
+          .order('start_at', { ascending: true })
+          .range(offset, offset + limit - 1);
+      } else if (type === 'past') {
+        query = query
+          .lt('start_at', now)
+          .order('start_at', { ascending: false })
+          .range(offset, offset + limit - 1);
       }
-      
-      const sortedRegistrations = Array.from(registrationsMap.entries())
-        .map(([email, data]) => ({
-          email,
-          full_name: data.full_name,
-          count: data.count
-        }))
-        .sort((a, b) => b.count - a.count);
-      
-      const BOM = '\uFEFF';
-      let csvContent = BOM + 'Имя,Email,Число посещений\n';
-      
-      sortedRegistrations.forEach(reg => {
-        csvContent += `"${reg.full_name.replace(/"/g, '""')}","${reg.email}",${reg.count}\n`;
-      });
-      
-      downloadCSV(csvContent, 'visitors_export');
-      alert(`Экспортировано ${sortedRegistrations.length} уникальных посетителей`);
+
+      const { data, error, count } = await query;
+
+      if (error) throw error;
+
+      return {
+        data: data || [],
+        hasMore: (data?.length || 0) === limit,
+        total: count || 0
+      };
     } catch (error) {
-      console.error('Ошибка экспорта посетителей:', error);
-      alert('Ошибка при экспорте данных посетителей');
-    }
-  };
-
-  // Функция экспорта полной статистики
-  const exportFullStats = async () => {
-    try {
-      const eventStats: Array<{
-        title: string;
-        date: string;
-        participants: number;
-        revenue: number;
-      }> = [];
-      
-      const eventTypes = ['nearest', 'upcoming', 'past'] as const;
-      
-      for (const type of eventTypes) {
-        for (const event of events[type]) {
-          const registrations = event.registrations || {};
-          const regs = registrations.reg_list || [];
-          const participants = regs.length;
-          const revenue = regs.reduce((sum: number, reg: any) => sum + (reg.total_amount || 0), 0);
-          
-          eventStats.push({
-            title: event.title || 'Без названия',
-            date: formatDate(event.start_at),
-            participants,
-            revenue
-          });
-        }
-      }
-      
-      const BOM = '\uFEFF';
-      let csvContent = BOM + 'Мероприятие,Дата,Участников,Выручка\n';
-      
-      eventStats.forEach(stat => {
-        csvContent += `"${stat.title.replace(/"/g, '""')}","${stat.date}",${stat.participants},${stat.revenue}\n`;
-      });
-      
-      downloadCSV(csvContent, 'full_stats_export');
-      alert(`Экспортирована статистика по ${eventStats.length} мероприятиям`);
-    } catch (error) {
-      console.error('Ошибка экспорта статистики:', error);
-      alert('Ошибка при экспорте полной статистики');
-    }
-  };
-
-  // Общая функция для скачивания CSV
-  const downloadCSV = (content: string, prefix: string) => {
-    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `${prefix}_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const handleExportClick = () => {
-    setIsExportModalOpen(true);
-  };
-
-  const handleExportConfirm = () => {
-    setIsExportModalOpen(false);
-    if (exportType === 'visitors') {
-      exportVisitors();
-    } else {
-      exportFullStats();
+      console.error(`Error loading ${type} events:`, error);
+      return { data: [], hasMore: false, total: 0 };
     }
   };
 
   // Функция расчета статистики
   const calculateStats = async () => {
     try {
-      let query = supabase.from('events').select('*');
-      const now = new Date();
-      let startDate, endDate;
-
-      switch (timeFilter) {
-        case 'today':
-          startDate = new Date(now.setHours(0, 0, 0, 0)).toISOString();
-          endDate = new Date(now.setHours(23, 59, 59, 999)).toISOString();
-          break;
-        case 'week':
-          const weekStart = new Date(now.setDate(now.getDate() - now.getDay()));
-          startDate = new Date(weekStart.setHours(0, 0, 0, 0)).toISOString();
-          endDate = new Date().toISOString();
-          break;
-        case 'month':
-          const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-          startDate = monthStart.toISOString();
-          endDate = new Date().toISOString();
-          break;
-        case 'custom':
-          if (customDateRange.start && customDateRange.end) {
-            startDate = new Date(customDateRange.start).toISOString();
-            endDate = new Date(customDateRange.end).toISOString();
-          } else {
-            startDate = null;
-            endDate = new Date().toISOString();
-          }
-          break;
-        default:
-          endDate = new Date().toISOString();
-      }
-
+      const allEvents = [...events.nearest, ...events.upcoming, ...events.past];
+      
+      let filteredEvents = allEvents;
+      
+      // Применяем фильтр по времени
       if (timeFilter !== 'all') {
-        if (startDate) {
-          query = query.gte('start_at', startDate);
+        const now = new Date();
+        let startDate: Date;
+
+        switch (timeFilter) {
+          case 'today':
+            startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            break;
+          case 'week':
+            startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            break;
+          case 'month':
+            startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            break;
+          case 'custom':
+            if (customDateRange.start && customDateRange.end) {
+              const start = new Date(customDateRange.start);
+              const end = new Date(customDateRange.end);
+              filteredEvents = allEvents.filter(event => {
+                const eventDate = new Date(event.start_at);
+                return eventDate >= start && eventDate <= end;
+              });
+            }
+            break;
+          default:
+            startDate = new Date(0);
         }
-        query = query.lte('start_at', endDate);
-      } else {
-        query = query.or(`start_at.lt.${new Date().toISOString()},status.eq.past`);
+
+        if (timeFilter !== 'custom') {
+          filteredEvents = allEvents.filter(event => 
+            new Date(event.start_at) >= startDate
+          );
+        }
       }
 
-      const { data: pastEvents, error } = await query;
-      if (error) throw error;
+      const totalEvents = filteredEvents.length;
+      const completedEvents = filteredEvents.filter(event => 
+        new Date(event.start_at) < new Date()
+      ).length;
 
-      const totalEvents = pastEvents?.length || 0;
       let totalParticipants = 0;
       let totalRevenue = 0;
-      let completedEvents = 0;
 
-      pastEvents?.forEach(event => {
+      filteredEvents.forEach(event => {
         const registrations = event.registrations || {};
-        const participants = parseInt(registrations.current || '0') || 0;
-        totalParticipants += participants;
-        
-        if (event.price && participants > 0) {
-          totalRevenue += event.price * participants;
-        }
-        
-        if (event.status === 'completed' || participants > 0) {
-          completedEvents++;
+        const currentRegs = parseInt(registrations.current || '0') || 0;
+        totalParticipants += currentRegs;
+
+        if (event.price && event.price > 0) {
+          totalRevenue += currentRegs * event.price;
         }
       });
 
@@ -634,20 +459,136 @@ const EventsStatistics = () => {
     }
   };
 
+  // Функция экспорта только посетителей
+  const exportVisitors = async () => {
+    try {
+      const registrationsMap = new Map<string, { full_name: string; count: number }>();
+      
+      const eventTypes = ['nearest', 'upcoming', 'past'] as const;
+      
+      for (const type of eventTypes) {
+        for (const event of events[type]) {
+          const registrations = event.registrations || {};
+          if (registrations.reg_list && Array.isArray(registrations.reg_list)) {
+            registrations.reg_list.forEach((reg: any) => {
+              if (reg.email && reg.full_name) {
+                const email = reg.email.toLowerCase().trim();
+                const current = registrationsMap.get(email);
+                
+                if (current) {
+                  registrationsMap.set(email, {
+                    full_name: current.full_name,
+                    count: current.count + 1
+                  });
+                } else {
+                  registrationsMap.set(email, {
+                    full_name: reg.full_name,
+                    count: 1
+                  });
+                }
+              }
+            });
+          }
+        }
+      }
+
+      // Конвертируем в CSV
+      const csvHeader = 'Имя,Email,Количество посещений\n';
+      const csvData = Array.from(registrationsMap.entries())
+        .map(([email, data]) => `"${data.full_name}","${email}",${data.count}`)
+        .join('\n');
+
+      const csvContent = csvHeader + csvData;
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      
+      if (link.download !== undefined) {
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `visitors_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    } catch (error) {
+      console.error('Error exporting visitors:', error);
+    }
+  };
+
+  // Функция экспорта полной статистики
+  const exportFullStats = async () => {
+    try {
+      const eventTypes = ['nearest', 'upcoming', 'past'] as const;
+      const allData: any[] = [];
+      
+      for (const type of eventTypes) {
+        for (const event of events[type]) {
+          const registrations = event.registrations || {};
+          const currentRegs = parseInt(registrations.current || '0') || 0;
+          const revenue = event.price && event.price > 0 ? currentRegs * event.price : 0;
+          
+          allData.push({
+            title: event.title || 'Без названия',
+            date: formatDate(event.start_at),
+            participants: currentRegs,
+            revenue: revenue,
+            currency: event.currency || 'RUB',
+            type: getEventTypeLabel(event.event_type),
+            status: type === 'past' ? 'Завершено' : type === 'nearest' ? 'Ближайшее' : 'Предстоящее'
+          });
+        }
+      }
+
+      const csvHeader = 'Мероприятие,Дата,Участников,Выручка,Валюта,Тип,Статус\n';
+      const csvData = allData
+        .map(row => `"${row.title}","${row.date}",${row.participants},${row.revenue},"${row.currency}","${row.type}","${row.status}"`)
+        .join('\n');
+
+      const csvContent = csvHeader + csvData;
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      
+      if (link.download !== undefined) {
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `events_stats_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    } catch (error) {
+      console.error('Error exporting full stats:', error);
+    }
+  };
+
+  // Обработчики
+  const handleExportClick = () => {
+    setIsExportModalOpen(true);
+  };
+
+  const handleExportConfirm = async () => {
+    setIsExportModalOpen(false);
+    
+    if (exportType === 'visitors') {
+      await exportVisitors();
+    } else {
+      await exportFullStats();
+    }
+  };
+
   // Начальная загрузка данных
   useEffect(() => {
     const loadInitialData = async () => {
       setLoading({ nearest: true, upcoming: true, past: true });
       
       try {
-        console.log('Loading initial data...');
         const [nearestResult, upcomingResult, pastResult] = await Promise.all([
           loadEventsFromSupabase('nearest', 0, 1),
           loadEventsFromSupabase('upcoming', 0, 6),
           loadEventsFromSupabase('past', 0, 10)
         ]);
-
-        console.log('Loaded data:', { nearestResult, upcomingResult, pastResult });
 
         setEvents({
           nearest: nearestResult.data,
@@ -716,8 +657,10 @@ const EventsStatistics = () => {
   const tabs = [
     { id: 'dashboard', label: 'Дашборд', icon: BarChart3 },
     { id: 'upcoming', label: 'Предстоящие', count: events.upcoming.length, icon: Calendar },
-    { id: 'past', label: 'Прошедшие', count: events.past.length, icon: TrendingUp }
+    { id: 'past', label: 'Прошедшие', count: events.past.length, icon: Clock }
   ];
+
+  // src/pages/admin/AdminEventStatistics.tsx - Часть 3 (интерфейс и модальные окна)
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-dark-900 dark:via-dark-900 dark:to-dark-800 py-8">
@@ -725,42 +668,45 @@ const EventsStatistics = () => {
         {/* Заголовок */}
         <div className="mb-12 text-center">
           <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-primary-600 via-primary-500 to-secondary-500 bg-clip-text text-transparent mb-4">
-            Управление мероприятиями
+            Статистика мероприятий
           </h1>
-          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto leading-relaxed">
-            Полная аналитика и контроль ваших событий
+          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
+            Аналитика и отчеты по вашим мероприятиям
           </p>
         </div>
 
-        {/* Вкладки */}
-        <div className="mb-10">
-          <div className="flex flex-wrap justify-center gap-2 bg-white dark:bg-dark-800 p-2 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700">
-            {tabs.map((tab) => {
-              const IconComponent = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center justify-center px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
-                    activeTab === tab.id
-                      ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-lg transform scale-105'
-                      : 'text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-gray-50 dark:hover:bg-dark-700'
-                  }`}
-                >
-                  <IconComponent className="w-5 h-5 mr-2" />
-                  {tab.label}
-                  {tab.count && tab.count > 0 && (
-                    <span className={`ml-3 px-2 py-1 text-sm rounded-full font-bold ${
+        {/* Навигационные вкладки */}
+        <div className="mb-8">
+          <div className="flex justify-center">
+            <div className="flex bg-gray-100 dark:bg-gray-700 p-1 rounded-xl">
+              {tabs.map((tab) => {
+                const IconComponent = tab.icon;
+                return (
+                  <Button
+                    key={tab.id}
+                    variant={activeTab === tab.id ? "primary" : "ghost"}
+                    onClick={() => setActiveTab(tab.id)}
+                    leftIcon={<IconComponent className="w-5 h-5" />}
+                    className={`${
                       activeTab === tab.id
-                        ? 'bg-white/20 text-white'
-                        : 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'
-                    }`}>
-                      {tab.count}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+                        ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-lg transform scale-105'
+                        : 'text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-gray-50 dark:hover:bg-dark-700'
+                    }`}
+                  >
+                    {tab.label}
+                    {tab.count && tab.count > 0 && (
+                      <span className={`ml-3 px-2 py-1 text-sm rounded-full font-bold ${
+                        activeTab === tab.id
+                          ? 'bg-white/20 text-white'
+                          : 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'
+                      }`}>
+                        {tab.count}
+                      </span>
+                    )}
+                  </Button>
+                );
+              })}
+            </div>
           </div>
         </div>
 
@@ -780,15 +726,14 @@ const EventsStatistics = () => {
                           <BarChart3 className="w-5 h-5 mr-2 text-primary-500" />
                           Статистика
                         </h3>
-                        <button
+                        <Button
+                          variant="primary"
+                          size="sm"
                           onClick={handleExportClick}
-                          className="flex items-center gap-2 bg-primary-500 hover:bg-primary-600 text-white px-3 py-1.5 rounded-lg transition-colors duration-200 shadow-sm text-sm"
+                          leftIcon={<Download className="h-4 w-4" />}
                         >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                          </svg>
                           Экспорт
-                        </button>
+                        </Button>
                       </div>
                       
                       <div className="mb-4">
@@ -797,40 +742,43 @@ const EventsStatistics = () => {
                           {timeFilters.map((filter) => {
                             const IconComponent = filter.icon;
                             return (
-                              <button
+                              <Button
                                 key={filter.id}
+                                variant={timeFilter === filter.id ? "primary" : "outline"}
+                                size="sm"
                                 onClick={() => setTimeFilter(filter.id)}
-                                className={`flex items-center px-2 py-1 rounded-md font-medium transition-all duration-200 text-xs ${
-                                  timeFilter === filter.id
-                                    ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
-                                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                                }`}
+                                leftIcon={<IconComponent className="w-3 h-3" />}
+                                className="text-xs"
                               >
-                                <IconComponent className="w-3 h-3 mr-1" />
                                 {filter.label}
-                              </button>
+                              </Button>
                             );
                           })}
                         </div>
-                        
+
+                        {/* Кастомный диапазон дат */}
                         {timeFilter === 'custom' && (
-                          <div className="flex gap-3">
+                          <div className="space-y-3">
                             <div>
-                              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">От</label>
+                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                Начальная дата
+                              </label>
                               <input
                                 type="date"
                                 value={customDateRange.start}
                                 onChange={(e) => setCustomDateRange(prev => ({ ...prev, start: e.target.value }))}
-                                className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md text-xs bg-white dark:bg-dark-700 text-gray-900 dark:text-white"
+                                className="form-input text-sm"
                               />
                             </div>
                             <div>
-                              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">До</label>
+                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                Конечная дата
+                              </label>
                               <input
                                 type="date"
                                 value={customDateRange.end}
                                 onChange={(e) => setCustomDateRange(prev => ({ ...prev, end: e.target.value }))}
-                                className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md text-xs bg-white dark:bg-dark-700 text-gray-900 dark:text-white"
+                                className="form-input text-sm"
                               />
                             </div>
                           </div>
@@ -838,32 +786,31 @@ const EventsStatistics = () => {
                       </div>
                     </div>
 
-                    {/* Компактная статистика 2x2 */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <StatCard
-                        title="Мероприятий"
-                        value={stats.totalEvents}
+                    {/* Карточки статистики */}
+                    <div className="grid grid-cols-1 gap-4">
+                      <StatCard 
+                        title="Мероприятий" 
+                        value={stats.totalEvents} 
                         icon={Calendar}
                         color="primary"
                       />
-                      <StatCard
-                        title="Участников"
-                        value={stats.totalParticipants.toLocaleString()}
+                      <StatCard 
+                        title="Участников" 
+                        value={stats.totalParticipants} 
                         icon={Users}
                         color="success"
                       />
-                      <StatCard
-                        title="Выручка"
-                        value={`${Math.round(stats.totalRevenue / 1000)}K ₽`}
+                      <StatCard 
+                        title="Выручка" 
+                        value={`${stats.totalRevenue.toLocaleString()} ₽`} 
                         icon={DollarSign}
                         color="warning"
                       />
-                      <StatCard
-                        title="Ср. посещ."
-                        value={stats.avgParticipants}
-                        subtitle={`${stats.completionRate}% успех`}
+                      <StatCard 
+                        title="Средн. участников" 
+                        value={stats.avgParticipants} 
                         icon={TrendingUp}
-                        color="error"
+                        color="info"
                       />
                     </div>
                   </div>
@@ -871,200 +818,102 @@ const EventsStatistics = () => {
 
                 {/* Ближайшее мероприятие */}
                 <div className="lg:col-span-2">
-                  <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center">
-                    <Clock className="w-5 h-5 mr-2 text-primary-500" />
-                    Ближайшее мероприятие
-                  </h2>
-                  {loading.nearest ? (
-                    <LoadingSpinner />
-                  ) : events.nearest.length > 0 ? (
-                    <div>
-                      {events.nearest.map((event) => (
-                        <EventCard key={event.id} event={event} />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-12 bg-white dark:bg-dark-800 rounded-2xl border border-gray-200 dark:border-gray-700">
-                      <div className="w-16 h-16 bg-gradient-to-br from-primary-100 to-primary-200 dark:from-primary-900/20 dark:to-primary-800/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Calendar className="w-8 h-8 text-primary-500" />
-                      </div>
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                        Нет ближайших мероприятий
-                      </h3>
-                      <p className="text-gray-500 dark:text-gray-400">
-                        Запланируйте новое мероприятие
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Предстоящие мероприятия */}
-              <div>
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center">
-                    <Calendar className="w-6 h-6 mr-3 text-primary-500" />
-                    Предстоящие мероприятия
-                  </h2>
-                  <div className="flex items-center gap-4">
-                    <ViewToggle isListView={isListView} onToggle={setIsListView} />
-                    <button
-                      onClick={() => setActiveTab('upcoming')}
-                      className="flex items-center text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium"
-                    >
-                      <Eye className="w-4 h-4 mr-1" />
-                      Смотреть все
-                    </button>
-                  </div>
-                </div>
-                {loading.upcoming ? (
-                  <LoadingSpinner />
-                ) : events.upcoming.length > 0 ? (
-                  <div>
-                    {isListView ? (
-                      <div className="space-y-3">
-                        {events.upcoming.slice(0, 6).map((event) => (
-                          <EventListItem key={event.id} event={event} />
-                        ))}
-                      </div>
+                  <div className="bg-white dark:bg-dark-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700">
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center">
+                      <Star className="w-5 h-5 mr-2 text-primary-500" />
+                      Ближайшее мероприятие
+                    </h3>
+                    
+                    {loading.nearest ? (
+                      <LoadingSpinner />
+                    ) : events.nearest.length > 0 ? (
+                      <EventCard event={events.nearest[0]} />
                     ) : (
-                      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                        {events.upcoming.slice(0, 6).map((event) => (
-                          <EventCard key={event.id} event={event} isCompact={true} />
-                        ))}
+                      <div className="text-center py-12">
+                        <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                        <p className="text-gray-500 dark:text-gray-400">
+                          Нет запланированных мероприятий
+                        </p>
                       </div>
                     )}
                   </div>
-                ) : (
-                  <div className="text-center py-12 bg-white dark:bg-dark-800 rounded-2xl border border-gray-200 dark:border-gray-700">
-                    <div className="w-16 h-16 bg-gradient-to-br from-primary-100 to-primary-200 dark:from-primary-900/20 dark:to-primary-800/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Calendar className="w-8 h-8 text-primary-500" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                      Нет предстоящих мероприятий
-                    </h3>
-                    <p className="text-gray-500 dark:text-gray-400">
-                      Создайте новое мероприятие
-                    </p>
-                  </div>
-                )}
+                </div>
               </div>
             </div>
           )}
 
+          {/* Вкладка предстоящих мероприятий */}
           {activeTab === 'upcoming' && (
-            <div>
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center">
-                  <Calendar className="w-6 h-6 mr-3 text-primary-500" />
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
                   Предстоящие мероприятия
                 </h2>
                 <ViewToggle isListView={isListView} onToggle={setIsListView} />
               </div>
+
               {loading.upcoming ? (
                 <LoadingSpinner />
               ) : events.upcoming.length > 0 ? (
-                <div className="space-y-8">
-                  {isListView ? (
-                    <div className="space-y-3">
-                      {events.upcoming.map((event) => (
-                        <EventListItem key={event.id} event={event} />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="grid gap-8 md:grid-cols-2 xl:grid-cols-3">
-                      {events.upcoming.map((event) => (
-                        <EventCard key={event.id} event={event} />
-                      ))}
-                    </div>
-                  )}
-                  {pagination.upcoming.hasMore && (
-                    <div className="text-center pt-4">
-                      <button
-                        onClick={() => loadMore('upcoming')}
-                        disabled={loadingMore.upcoming}
-                        className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white font-semibold rounded-xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-lg"
-                      >
-                        {loadingMore.upcoming ? (
-                          <>
-                            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                            Загрузка...
-                          </>
-                        ) : (
-                          <>
-                            <ChevronDown className="w-5 h-5 mr-2" />
-                            Показать еще 10 мероприятий
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  )}
+                <div className={isListView ? 'space-y-4' : 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6'}>
+                  {events.upcoming.map((event, index) => (
+                    <EventCard 
+                      key={event.id || index} 
+                      event={event} 
+                      isCompact={isListView}
+                    />
+                  ))}
                 </div>
               ) : (
                 <div className="text-center py-16">
-                  <div className="w-24 h-24 bg-gradient-to-br from-primary-100 to-primary-200 dark:from-primary-900/20 dark:to-primary-800/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <Calendar className="w-12 h-12 text-primary-500" />
-                  </div>
+                  <Calendar className="w-24 h-24 text-gray-400 mx-auto mb-6" />
                   <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
                     Нет предстоящих мероприятий
                   </h3>
                   <p className="text-gray-500 dark:text-gray-400">
-                    Создайте новое мероприятие, чтобы начать привлекать участников
+                    Создайте новое мероприятие, чтобы увидеть его здесь
                   </p>
+                </div>
+              )}
+
+              {/* Кнопка "Загрузить еще" */}
+              {pagination.upcoming.hasMore && (
+                <div className="text-center pt-6">
+                  <Button
+                    variant="outline"
+                    onClick={() => loadMore('upcoming')}
+                    loading={loadingMore.upcoming}
+                    leftIcon={!loadingMore.upcoming ? <ChevronDown className="w-5 h-5" /> : undefined}
+                  >
+                    {loadingMore.upcoming ? 'Загрузка...' : 'Показать еще 10 мероприятий'}
+                  </Button>
                 </div>
               )}
             </div>
           )}
 
+          {/* Вкладка прошедших мероприятий */}
           {activeTab === 'past' && (
-            <div>
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center">
-                  <TrendingUp className="w-6 h-6 mr-3 text-primary-500" />
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
                   Прошедшие мероприятия
                 </h2>
                 <ViewToggle isListView={isListView} onToggle={setIsListView} />
               </div>
-              
+
               {loading.past ? (
                 <LoadingSpinner />
               ) : events.past.length > 0 ? (
-                <div className="space-y-8">
-                  {isListView ? (
-                    <div className="space-y-3">
-                      {events.past.map((event) => (
-                        <EventListItem key={event.id} event={event} isPast={true} />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="grid gap-8 md:grid-cols-2 xl:grid-cols-3">
-                      {events.past.map((event) => (
-                        <EventCard key={event.id} event={event} isPast={true} />
-                      ))}
-                    </div>
-                  )}
-                  
-                  {pagination.past.hasMore && (
-                    <div className="text-center pt-4">
-                      <button
-                        onClick={() => loadMore('past')}
-                        disabled={loadingMore.past}
-                        className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white font-semibold rounded-xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-lg"
-                      >
-                        {loadingMore.past ? (
-                          <>
-                            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                            Загрузка...
-                          </>
-                        ) : (
-                          <>
-                            <ChevronDown className="w-5 h-5 mr-2" />
-                            Показать еще 10 мероприятий
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  )}
+                <div className={isListView ? 'space-y-4' : 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6'}>
+                  {events.past.map((event, index) => (
+                    <EventCard 
+                      key={event.id || index} 
+                      event={event} 
+                      isPast={true}
+                      isCompact={isListView}
+                    />
+                  ))}
                 </div>
               ) : (
                 <div className="text-center py-16">
@@ -1079,77 +928,92 @@ const EventsStatistics = () => {
                   </p>
                 </div>
               )}
+
+              {/* Кнопка "Загрузить еще" */}
+              {pagination.past.hasMore && (
+                <div className="text-center pt-6">
+                  <Button
+                    variant="outline"
+                    onClick={() => loadMore('past')}
+                    loading={loadingMore.past}
+                    leftIcon={!loadingMore.past ? <ChevronDown className="w-5 h-5" /> : undefined}
+                  >
+                    {loadingMore.past ? 'Загрузка...' : 'Показать еще 10 мероприятий'}
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </div>
 
         {/* Модальное окно экспорта */}
-        <Dialog
-          open={isExportModalOpen}
+        <Modal
+          isOpen={isExportModalOpen}
           onClose={() => setIsExportModalOpen(false)}
-          className="fixed z-50 inset-0 overflow-y-auto"
+          title="Экспорт данных"
+          size="md"
         >
-          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <Dialog.Overlay className="fixed inset-0 bg-black bg-opacity-30 transition-opacity" />
-            
-            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-            
-            <div className="inline-block align-bottom bg-white dark:bg-dark-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-              <div className="px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                <Dialog.Title className="text-lg font-bold text-gray-900 dark:text-white mb-4">
-                  Выберите тип экспорта
-                </Dialog.Title>
+          <div className="space-y-6">
+            <div>
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
+                Выберите тип данных для экспорта:
+              </p>
+              
+              <div className="space-y-3">
+                <div className="flex items-start">
+                  <input
+                    id="visitors-export"
+                    name="export-type"
+                    type="radio"
+                    checked={exportType === 'visitors'}
+                    onChange={() => setExportType('visitors')}
+                    className="h-4 w-4 mt-1 text-primary-600 focus:ring-primary-500 border-gray-300 dark:border-gray-600"
+                  />
+                  <label htmlFor="visitors-export" className="ml-3 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <span className="font-semibold">Только посетители</span>
+                    <p className="text-gray-500 dark:text-gray-400 mt-1">
+                      Содержит: Имя, Email, Количество посещений
+                    </p>
+                  </label>
+                </div>
                 
-                <div className="space-y-4 mb-6">
-                  <div className="flex items-start">
-                    <input
-                      id="visitors-export"
-                      type="radio"
-                      checked={exportType === 'visitors'}
-                      onChange={() => setExportType('visitors')}
-                      className="h-4 w-4 mt-1 text-primary-600 focus:ring-primary-500 border-gray-300 dark:border-gray-600"
-                    />
-                    <label htmlFor="visitors-export" className="ml-3 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      <span className="font-semibold">Только посетители</span>
-                      <p className="text-gray-500 dark:text-gray-400 mt-1">Содержит: Имя, Email, Число посещений</p>
-                    </label>
-                  </div>
-                  
-                  <div className="flex items-start">
-                    <input
-                      id="fullstats-export"
-                      type="radio"
-                      checked={exportType === 'full_stats'}
-                      onChange={() => setExportType('full_stats')}
-                      className="h-4 w-4 mt-1 text-primary-600 focus:ring-primary-500 border-gray-300 dark:border-gray-600"
-                    />
-                    <label htmlFor="fullstats-export" className="ml-3 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      <span className="font-semibold">Полная статистика</span>
-                      <p className="text-gray-500 dark:text-gray-400 mt-1">Содержит: Мероприятие, Дата, Участников, Выручка</p>
-                    </label>
-                  </div>
+                <div className="flex items-start">
+                  <input
+                    id="fullstats-export"
+                    name="export-type"
+                    type="radio"
+                    checked={exportType === 'full_stats'}
+                    onChange={() => setExportType('full_stats')}
+                    className="h-4 w-4 mt-1 text-primary-600 focus:ring-primary-500 border-gray-300 dark:border-gray-600"
+                  />
+                  <label htmlFor="fullstats-export" className="ml-3 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <span className="font-semibold">Полная статистика</span>
+                    <p className="text-gray-500 dark:text-gray-400 mt-1">
+                      Содержит: Мероприятие, Дата, Участников, Выручка
+                    </p>
+                  </label>
                 </div>
               </div>
-              
-              <div className="px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                <button
-                  type="button"
-                  onClick={handleExportConfirm}
-                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-primary-600 text-base font-medium text-white hover:bg-primary-700 focus:outline-none sm:ml-3 sm:w-auto sm:text-sm"
-                >
-                  Экспортировать
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsExportModalOpen(false)}
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-dark-700 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-dark-600 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
-                >
-                  Отмена
-                </button>
-              </div>
+            </div>
+            
+            <div className="flex gap-3 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => setIsExportModalOpen(false)}
+                fullWidth
+              >
+                Отмена
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleExportConfirm}
+                fullWidth
+              >
+                Экспортировать
+              </Button>
             </div>
           </div>
-        </Dialog>
+        </Modal>
       </div>
     </div>
   );
