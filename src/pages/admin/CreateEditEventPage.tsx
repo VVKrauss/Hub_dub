@@ -222,9 +222,9 @@ const CreateEditEventPage = () => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     
-    if (name === 'title' && value.length > TITLE_MAX_LENGTH) return;
-    if (name === 'short_description' && value.length > SHORT_DESC_MAX_LENGTH) return;
-    if (name === 'description' && value.length > DESC_MAX_LENGTH) return;
+    if (name === 'title' && value && value.length > TITLE_MAX_LENGTH) return;
+    if (name === 'short_description' && value && value.length > SHORT_DESC_MAX_LENGTH) return;
+    if (name === 'description' && value && value.length > DESC_MAX_LENGTH) return;
     
     setEvent(prev => ({
       ...prev,
@@ -317,7 +317,6 @@ const CreateEditEventPage = () => {
       [name]: checked
     }));
   };
-
 
   // src/pages/admin/CreateEditEventPage.tsx - Готовая часть 3
 
@@ -659,7 +658,8 @@ const CreateEditEventPage = () => {
         </div>
       </div>
 
-// src/pages/admin/CreateEditEventPage.tsx - Готовая часть 5
+{/* // src/pages/admin/CreateEditEventPage.tsx - Готовая часть 5 */}
+
 
       {/* Основная форма */}
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -690,7 +690,7 @@ const CreateEditEventPage = () => {
                 placeholder="Введите название мероприятия"
               />
               <p className="text-gray-500 text-sm text-right mt-2">
-                {event.title.length}/{TITLE_MAX_LENGTH}
+                {(event.title || '').length}/{TITLE_MAX_LENGTH}
               </p>
             </div>
             
@@ -703,13 +703,13 @@ const CreateEditEventPage = () => {
                 type="text"
                 id="short_description"
                 name="short_description"
-                value={event.short_description}
+                value={event.short_description || ''}
                 onChange={handleInputChange}
                 className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-dark-600 bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800 transition-colors"
                 placeholder="Краткое описание для списка мероприятий"
               />
               <p className="text-gray-500 text-sm text-right mt-2">
-                {event.short_description.length}/{SHORT_DESC_MAX_LENGTH}
+                {(event.short_description || '').length}/{SHORT_DESC_MAX_LENGTH}
               </p>
             </div>
             
@@ -721,7 +721,7 @@ const CreateEditEventPage = () => {
               <textarea
                 id="description"
                 name="description"
-                value={event.description}
+                value={event.description || ''}
                 onChange={handleInputChange}
                 rows={6}
                 className={`w-full px-4 py-3 rounded-lg border transition-colors ${
@@ -732,7 +732,7 @@ const CreateEditEventPage = () => {
                 placeholder="Подробное описание мероприятия"
               />
               <p className="text-gray-500 text-sm text-right mt-2">
-                {event.description.length}/{DESC_MAX_LENGTH}
+                {(event.description || '').length}/{DESC_MAX_LENGTH}
               </p>
             </div>
             
@@ -871,7 +871,7 @@ const CreateEditEventPage = () => {
         </div>
 
 
-// src/pages/admin/CreateEditEventPage.tsx - Готовая часть 6
+{/* // src/pages/admin/CreateEditEventPage.tsx - Готовая часть 6 */}
 
         {/* Обложка мероприятия */}
         <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-dark-600 p-6">
@@ -1040,7 +1040,7 @@ const CreateEditEventPage = () => {
         </div>
         
 
-// src/pages/admin/CreateEditEventPage.tsx - Готовая часть 7
+{/* // src/pages/admin/CreateEditEventPage.tsx - Готовая часть 7 */}
 
         {/* Информация об оплате */}
         <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-dark-600 p-6">
