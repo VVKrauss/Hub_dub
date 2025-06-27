@@ -871,7 +871,7 @@ const CreateEditEventPage = () => {
         </div>
 
 
-        // src/pages/admin/CreateEditEventPage.tsx - Готовая часть 6
+// src/pages/admin/CreateEditEventPage.tsx - Готовая часть 6
 
         {/* Обложка мероприятия */}
         <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-dark-600 p-6">
@@ -970,9 +970,9 @@ const CreateEditEventPage = () => {
               <div key={index} className="flex items-center gap-3 p-3 border border-gray-300 dark:border-dark-600 rounded-lg">
                 <input
                   type="url"
-                  value={photo}
+                  value={photo || ''}
                   onChange={(e) => {
-                    const newGallery = [...event.photo_gallery];
+                    const newGallery = [...(event.photo_gallery || [])];
                     newGallery[index] = e.target.value;
                     setEvent(prev => ({
                       ...prev,
@@ -985,7 +985,7 @@ const CreateEditEventPage = () => {
                 <button
                   type="button"
                   onClick={() => {
-                    const newGallery = event.photo_gallery.filter((_, i) => i !== index);
+                    const newGallery = (event.photo_gallery || []).filter((_, i) => i !== index);
                     setEvent(prev => ({
                       ...prev,
                       photo_gallery: newGallery
@@ -1038,8 +1038,9 @@ const CreateEditEventPage = () => {
             )}
           </div>
         </div>
+        
 
-        // src/pages/admin/CreateEditEventPage.tsx - Готовая часть 7
+// src/pages/admin/CreateEditEventPage.tsx - Готовая часть 7
 
         {/* Информация об оплате */}
         <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-dark-600 p-6">
