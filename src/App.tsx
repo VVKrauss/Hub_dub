@@ -21,8 +21,8 @@ import AdminNavigation from './pages/admin/AdminNavigation';
 import AdminExport from './pages/admin/AdminExport';
 import AdminEventStatistics from './pages/admin/AdminEventStatistics';
 import AdminAttendance from './pages/admin/AdminAttendance';
-import AdminOblaKarteStats from './pages/admin/AdminOblaKarteStats';
-import AdminOblaKarteStats from './pages/admin/AdminOblaKarteStats';
+import AdminOblaKarteStats from './pages/admin/AdminOblaKarteStats'; // только один раз
+import ProtectedRoute from './components/admin/ProtectedRoute';
 import ProtectedRoute from './components/admin/ProtectedRoute';
 import PublicProtectedRoute from './components/auth/PublicProtectedRoute';
 import AdminCalendarPage from './pages/admin/AdminCalendarPage';
