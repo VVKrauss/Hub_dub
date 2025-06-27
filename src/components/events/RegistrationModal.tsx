@@ -8,6 +8,7 @@ import { syncUserRegistration } from '../../utils/registrationSync';
 import Modal from '../ui/Modal';
 import { EventRegistrations } from '../../pages/admin/constants';
 
+// Обновленный тип пропсов для RegistrationModal
 type RegistrationModalProps = {
   isOpen: boolean;
   onClose: () => void;
@@ -29,6 +30,7 @@ type RegistrationModalProps = {
   };
 };
 
+// Внутри компонента RegistrationModal добавляем функцию для проверки
 const RegistrationModal = ({ isOpen, onClose, event }: RegistrationModalProps) => {
   const { user: currentUser } = useAuth();
   
@@ -64,8 +66,12 @@ const RegistrationModal = ({ isOpen, onClose, event }: RegistrationModalProps) =
 
   const isFreeOrDonation = event.payment_type === 'free' || event.payment_type === 'donation';
   
+  // Функция для определения, только ли для взрослых мероприятие
+  const isAdultsOnly = event.age_category === '18+';
+  
   const roundUpToHundred = (num: number) => Math.ceil(num / 100) * 100;
 
+  // Обновленная функция расчета стоимости
   const calculateTotal = () => {
     if (isFreeOrDonation) return 0;
 
@@ -82,7 +88,8 @@ const RegistrationModal = ({ isOpen, onClose, event }: RegistrationModalProps) =
       adultTotal = formData.adultTickets * event.price;
     }
 
-    if (!event.adults_only) {
+    // Детские билеты только если НЕ 18+
+    if (!isAdultsOnly) {
       const childPrice = event.child_half_price ? event.price / 2 : event.price;
       childTotal = formData.childTickets * childPrice;
     }
@@ -90,13 +97,15 @@ const RegistrationModal = ({ isOpen, onClose, event }: RegistrationModalProps) =
     return adultTotal + childTotal;
   };
 
+  // Обновленная функция получения деталей цены
   const getPriceDetails = () => {
     if (isFreeOrDonation) return null;
 
     const details = [];
     const totalAdult = formData.adultTickets;
-    const totalChild = event.adults_only ? 0 : formData.childTickets;
+    const totalChild = isAdultsOnly ? 0 : formData.childTickets;
 
+    // Детали для взрослых билетов
     if (event.couple_discount && totalAdult >= 2) {
       const pairs = Math.floor(totalAdult / 2);
       const single = totalAdult % 2;
@@ -134,7 +143,8 @@ const RegistrationModal = ({ isOpen, onClose, event }: RegistrationModalProps) =
       );
     }
 
-    if (!event.adults_only && totalChild > 0) {
+    // Детали для детских билетов (только если НЕ 18+)
+    if (!isAdultsOnly && totalChild > 0) {
       const childPrice = event.child_half_price ? event.price / 2 : event.price;
       details.push(
         <div key="child" className="flex justify-between">
@@ -154,6 +164,30 @@ const RegistrationModal = ({ isOpen, onClose, event }: RegistrationModalProps) =
     return details;
   };
 
+  const generateOptions = (max: number, start: number = 0) => {
+    return Array.from({ length: max + 1 - start }, (_, i) => start + i);
+  };
+
+  const resetForm = () => {
+    setFormData({
+      name: currentUser?.name || '',
+      contact: currentUser?.email || '',
+      phone: '',
+      comment: '',
+      adultTickets: 1,
+      childTickets: 0,
+    });
+    setRegistrationSuccess(false);
+    setRegistrationDetails(null);
+  };
+
+  useEffect(() => {
+    if (!isOpen) {
+      resetForm();
+    }
+  }, [isOpen]);
+
+  // Обновленная функция отправки формы
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -169,246 +203,275 @@ const RegistrationModal = ({ isOpen, onClose, event }: RegistrationModalProps) =
         phone: formData.phone,
         comment: formData.comment,
         adult_tickets: Number(formData.adultTickets),
-        child_tickets: Number(event.adults_only ? 0 : formData.childTickets),
-        total_amount: Number(total),
+        child_tickets: Number(isAdultsOnly ? 0 : formData.childTickets), // Обновлено
+        total_amount: total,
         status: true,
-        qr_code: registrationId, // Используем ID как QR код
-        created_at: new Date().toISOString(),
-        payment_link_clicked: false,
+        created_at: new Date().toISOString()
       };
 
-      // Call the Edge Function instead of directly updating the database
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/register-event`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-          },
-          body: JSON.stringify({
-            eventId: event.id,
-            registrationData
-          })
-        }
-      );
+      const { data, error } = await supabase
+        .from('event_registrations')
+        .insert({
+          event_id: event.id,
+          user_id: currentUser?.id || null,
+          ...registrationData
+        })
+        .select()
+        .single();
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to register for event');
-      }
+      if (error) throw error;
 
-      const result = await response.json();
-
-      // Если пользователь авторизован, синхронизируем регистрацию с таблицей user_event_registrations
-      if (currentUser) {
-        try {
-          await syncUserRegistration(
-            currentUser.id,
-            event.id,
-            registrationData,
-            isFreeOrDonation ? 'free' : 'pending'
-          );
-          console.log('User registration synced successfully');
-        } catch (syncError) {
-          console.error('Failed to sync user registration:', syncError);
-          // Не показываем ошибку пользователю, так как основная регистрация прошла успешно
-        }
-      }
+      await syncUserRegistration(event.id, registrationData);
 
       setRegistrationDetails({
         id: registrationId,
         fullName: formData.name,
         email: formData.contact,
         adultTickets: formData.adultTickets,
-        childTickets: event.adults_only ? 0 : formData.childTickets,
-        total,
+        childTickets: isAdultsOnly ? 0 : formData.childTickets,
+        total: total
       });
-      
+
       setRegistrationSuccess(true);
-      toast.success('Регистрация успешна!');
+      toast.success('Регистрация прошла успешно!');
+
+      if (event.payment_type === 'paid' && event.payment_link) {
+        window.open(event.payment_link, '_blank');
+      }
+
     } catch (error) {
       console.error('Registration error:', error);
-      toast.error('Ошибка при регистрации: ' + (error instanceof Error ? error.message : 'Неизвестная ошибка'));
+      toast.error('Ошибка при регистрации. Попробуйте еще раз.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Генерируем опции для выпадающих меню
-  const generateOptions = (max: number, start: number = 0) => {
-    return Array.from({ length: max - start + 1 }, (_, i) => start + i);
-  };
-
-  // Сброс формы при закрытии
-  const handleClose = () => {
-    setFormData({
-      name: '',
-      contact: '',
-      phone: '',
-      comment: '',
-      adultTickets: 1,
-      childTickets: 0,
-    });
-    setRegistrationSuccess(false);
-    setRegistrationDetails(null);
-    onClose();
-  };
-
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={handleClose}
-      title={event.title}
-      size="md"
-    >
-      <div className="p-3 space-y-3">
+    <Modal isOpen={isOpen} onClose={onClose} className="max-w-2xl">
+      <div className="relative">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors z-10"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
         {registrationSuccess && registrationDetails ? (
-          <div className="text-center py-6 space-y-4">
-            <div className="w-16 h-16 mx-auto bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
-              <CheckCircle className="w-10 h-10 text-green-600 dark:text-green-400" />
-            </div>
-            
-            <div>
-              <h3 className="text-lg font-semibold mb-2">Регистрация успешна!</h3>
-              <div className="text-sm text-gray-600 dark:text-gray-300 space-y-1">
-                <p><strong>Имя:</strong> {registrationDetails.fullName}</p>
-                <p><strong>Email:</strong> {registrationDetails.email}</p>
-                <p><strong>Билеты:</strong> {registrationDetails.adultTickets} взрослых, {registrationDetails.childTickets} детей</p>
-                {registrationDetails.total > 0 && (
-                  <p><strong>Сумма:</strong> {registrationDetails.total} {event.currency}</p>
-                )}
-                <p><strong>ID регистрации:</strong> {registrationDetails.id}</p>
+          <>
+            <div className="text-center py-8">
+              <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                Регистрация завершена!
+              </h2>
+              <p className="text-gray-600 dark:text-gray-300 mb-6">
+                Ваша регистрация на мероприятие "{event.title}" прошла успешно
+              </p>
+              
+              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-6 text-left">
+                <h3 className="font-medium mb-3">Детали регистрации:</h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span>ID регистрации:</span>
+                    <span className="font-mono">{registrationDetails.id}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Имя:</span>
+                    <span>{registrationDetails.fullName}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Email:</span>
+                    <span>{registrationDetails.email}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Билетов (взрослые):</span>
+                    <span>{registrationDetails.adultTickets}</span>
+                  </div>
+                  {!isAdultsOnly && registrationDetails.childTickets > 0 && (
+                    <div className="flex justify-between">
+                      <span>Билетов (дети):</span>
+                      <span>{registrationDetails.childTickets}</span>
+                    </div>
+                  )}
+                  {!isFreeOrDonation && (
+                    <div className="flex justify-between font-medium">
+                      <span>Итого:</span>
+                      <span>{registrationDetails.total} {event.currency}</span>
+                    </div>
+                  )}
+                </div>
               </div>
+
+              <button
+                onClick={onClose}
+                className="w-full bg-primary-600 text-white py-2 px-4 rounded-lg hover:bg-primary-700 transition-colors"
+              >
+                Закрыть
+              </button>
             </div>
-            
-            <button
-              onClick={handleClose}
-              className="w-full border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 py-2 px-4 rounded text-sm text-gray-700 dark:text-gray-200"
-            >
-              Закрыть
-            </button>
-          </div>
+          </>
         ) : (
           <>
-            {/* Информация о мероприятии */}
-            <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-              <div className="flex items-center gap-1">
-                <Calendar className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                <span>{formatRussianDate(event.start_at, 'dd.MM.yyyy')}</span>
+            <div className="p-6">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+                Регистрация на мероприятие
+              </h2>
+              
+              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-6">
+                <h3 className="font-medium text-gray-900 dark:text-white mb-2">{event.title}</h3>
+                <div className="space-y-1 text-sm text-gray-600 dark:text-gray-300">
+                  <div className="flex items-center">
+                    <Calendar className="w-4 h-4 mr-2" />
+                    {formatRussianDate(event.start_at)}
+                  </div>
+                  <div className="flex items-center">
+                    <Clock className="w-4 h-4 mr-2" />
+                    {formatTimeFromTimestamp(event.start_at)}
+                  </div>
+                  <div className="flex items-center">
+                    <MapPin className="w-4 h-4 mr-2" />
+                    {event.location}
+                  </div>
+                  {!isFreeOrDonation && (
+                    <div className="flex items-center">
+                      <CreditCard className="w-4 h-4 mr-2" />
+                      {event.price} {event.currency}
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center gap-1">
-                <Clock className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                <span>{formatTimeFromTimestamp(event.start_at)}</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <MapPin className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                <span className="line-clamp-1 max-w-[100px]">{event.location}</span>
-              </div>
-              {!isFreeOrDonation && (
-                <div className="flex items-center gap-1">
-                  <CreditCard className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                  <span>{event.price} {event.currency}</span>
+
+              {/* Информация о возрастных ограничениях */}
+              {isAdultsOnly && (
+                <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-sm mb-6">
+                  <p className="text-amber-800 dark:text-amber-200">
+                    <strong>Возрастное ограничение:</strong> Данное мероприятие предназначено только для лиц старше 18 лет
+                  </p>
                 </div>
               )}
             </div>
 
-            {/* Форма регистрации */}
-            <form onSubmit={handleSubmit} className="space-y-3">
-              <input
-                type="text"
-                placeholder="Ваше имя"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full border border-gray-300 dark:border-gray-600 rounded p-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-                required
-              />
-              
-              <input
-                type="email"
-                placeholder="Email"
-                value={formData.contact}
-                onChange={(e) => setFormData({ ...formData, contact: e.target.value })}
-                className="w-full border border-gray-300 dark:border-gray-600 rounded p-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-                required
-              />
+            <form onSubmit={handleSubmit} className="px-6 pb-6">
+              <div className="space-y-4 mb-6">
+                <div>
+                  <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Полное имя *
+                  </label>
+                  <input
+                    type="text"
+                    id="name"
+                    required
+                    value={formData.name}
+                    onChange={(e) => setFormData({...formData, name: e.target.value})}
+                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-3 focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    placeholder="Введите ваше полное имя"
+                  />
+                </div>
 
-              <input
-                type="tel"
-                placeholder="Телефон"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                className="w-full border border-gray-300 dark:border-gray-600 rounded p-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-              />
+                <div>
+                  <label htmlFor="contact" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Email *
+                  </label>
+                  <input
+                    type="email"
+                    id="contact"
+                    required
+                    value={formData.contact}
+                    onChange={(e) => setFormData({...formData, contact: e.target.value})}
+                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-3 focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    placeholder="Введите ваш email"
+                  />
+                </div>
 
-              <textarea
-                placeholder="Комментарий"
-                value={formData.comment}
-                onChange={(e) => setFormData({ ...formData, comment: e.target.value })}
-                className="w-full border border-gray-300 dark:border-gray-600 rounded p-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-                rows={3}
-              />
+                <div>
+                  <label htmlFor="phone" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Телефон
+                  </label>
+                  <input
+                    type="tel"
+                    id="phone"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-3 focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    placeholder="Введите ваш номер телефона"
+                  />
+                </div>
 
-              {/* Выбор количества билетов */}
-              {!isFreeOrDonation && (
-                <div className={`flex gap-2 ${event.adults_only ? 'justify-center' : ''}`}>
-                  <div className={event.adults_only ? 'w-full' : 'flex-1'}>
-                    <label className="block text-xs font-medium mb-1">Взрослых билетов</label>
-                    <select
-                      value={formData.adultTickets}
-                      onChange={(e) => setFormData({ ...formData, adultTickets: Number(e.target.value) })}
-                      className="w-full border border-gray-300 dark:border-gray-600 rounded p-2 text-sm bg-white dark:bg-gray-700"
-                    >
-                      {generateOptions(10, 1).map(num => (
-                        <option key={num} value={num}>{num}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {!event.adults_only && (
-                    <div className="flex-1">
-                      <label className="block text-xs font-medium mb-1">Детских билетов</label>
+                {/* В JSX части для выбора билетов: */}
+                {!isFreeOrDonation && (
+                  <div className={`flex gap-2 ${isAdultsOnly ? 'justify-center' : ''}`}>
+                    <div className={isAdultsOnly ? 'w-full' : 'flex-1'}>
+                      <label className="block text-xs font-medium mb-1">Взрослых билетов</label>
                       <select
-                        value={formData.childTickets}
-                        onChange={(e) => setFormData({ ...formData, childTickets: Number(e.target.value) })}
+                        value={formData.adultTickets}
+                        onChange={(e) => setFormData({ ...formData, adultTickets: Number(e.target.value) })}
                         className="w-full border border-gray-300 dark:border-gray-600 rounded p-2 text-sm bg-white dark:bg-gray-700"
                       >
-                        {generateOptions(10, 0).map(num => (
+                        {generateOptions(10, 1).map(num => (
                           <option key={num} value={num}>{num}</option>
                         ))}
                       </select>
                     </div>
-                  )}
-                </div>
-              )}
 
-              {/* Детализация цены */}
+                    {!isAdultsOnly && (
+                      <div className="flex-1">
+                        <label className="block text-xs font-medium mb-1">Детских билетов</label>
+                        <select
+                          value={formData.childTickets}
+                          onChange={(e) => setFormData({ ...formData, childTickets: Number(e.target.value) })}
+                          className="w-full border border-gray-300 dark:border-gray-600 rounded p-2 text-sm bg-white dark:bg-gray-700"
+                        >
+                          {generateOptions(10, 0).map(num => (
+                            <option key={num} value={num}>{num}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div>
+                  <label htmlFor="comment" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Комментарий
+                  </label>
+                  <textarea
+                    id="comment"
+                    rows={3}
+                    value={formData.comment}
+                    onChange={(e) => setFormData({...formData, comment: e.target.value})}
+                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-3 focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    placeholder="Дополнительная информация (необязательно)"
+                  />
+                </div>
+              </div>
+
               {!isFreeOrDonation && (
-                <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded text-sm">
-                  <h4 className="font-semibold mb-2">Детализация стоимости:</h4>
-                  <div className="space-y-1">
+                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-6">
+                  <h4 className="font-medium mb-2">Расчет стоимости:</h4>
+                  <div className="space-y-1 text-sm">
                     {getPriceDetails()}
-                    <div className="border-t pt-1 mt-2 font-semibold flex justify-between">
-                      <span>Итого:</span>
-                      <span>{calculateTotal()} {event.currency}</span>
+                    <div className="border-t pt-2 font-medium">
+                      <div className="flex justify-between">
+                        <span>Итого:</span>
+                        <span>{calculateTotal()} {event.currency}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Кнопки */}
-              <div className="flex gap-2 pt-2">
+              <div className="flex gap-3">
                 <button
                   type="button"
-                  onClick={handleClose}
-                  className="flex-1 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 py-2 px-4 rounded text-sm text-gray-700 dark:text-gray-200"
+                  onClick={onClose}
+                  className="flex-1 py-2 px-4 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                 >
                   Отмена
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex-1 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white py-2 px-4 rounded text-sm transition-colors"
+                  className="flex-1 bg-primary-600 text-white py-2 px-4 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {loading ? '...' : 'Подтвердить'}
                 </button>
