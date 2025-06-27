@@ -48,8 +48,16 @@ const PaymentOptionsModal = ({
 
   const handleOnlinePayment = () => {
     if (paymentType === 'widget' && oblakkarteDataEventId) {
-      // Виджет откроется автоматически при клике на кнопку с data-oblak-widget
-      return;
+      // Открываем виджет напрямую через API
+      if (window.OblakWidget) {
+        window.OblakWidget.open({
+          eventId: oblakkarteDataEventId,
+          lang: 'ru'
+        });
+      } else {
+        console.error('Виджет Oblakkarte не загружен');
+      }
+      onClose();
     } else if (paymentType === 'link' && paymentLink) {
       // Переход по ссылке
       window.open(paymentLink, '_blank');
@@ -68,45 +76,20 @@ const PaymentOptionsModal = ({
     >
       <div className="space-y-4">
         {hasOnlinePayment && (
-          <>
-            {paymentType === 'widget' && oblakkarteDataEventId ? (
-              // Кнопка виджета согласно документации
-              <a
-                href="#"
-                data-oblak-widget
-                data-event-id={oblakkarteDataEventId}
-                data-lang="ru"
-                className="w-full p-4 border-2 border-primary-500 rounded-lg hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors flex items-center gap-4 text-left no-underline"
-                onClick={(e) => e.preventDefault()}
-              >
-                <div className="p-2 bg-primary-100 dark:bg-primary-900/30 rounded-full">
-                  <CreditCard className="h-6 w-6 text-primary-600 dark:text-primary-400" />
-                </div>
-                <div className="text-left">
-                  <h3 className="font-medium text-gray-900 dark:text-white">Купить билет онлайн</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Оплатите сейчас картой или электронным кошельком
-                  </p>
-                </div>
-              </a>
-            ) : (
-              // Обычная кнопка для ссылки
-              <button
-                onClick={handleOnlinePayment}
-                className="w-full p-4 border-2 border-primary-500 rounded-lg hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors flex items-center gap-4"
-              >
-                <div className="p-2 bg-primary-100 dark:bg-primary-900/30 rounded-full">
-                  <CreditCard className="h-6 w-6 text-primary-600 dark:text-primary-400" />
-                </div>
-                <div className="text-left">
-                  <h3 className="font-medium">Онлайн оплата</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Оплатите сейчас картой или электронным кошельком
-                  </p>
-                </div>
-              </button>
-            )}
-          </>
+          <button
+            onClick={handleOnlinePayment}
+            className="w-full p-4 border-2 border-primary-500 rounded-lg hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors flex items-center gap-4"
+          >
+            <div className="p-2 bg-primary-100 dark:bg-primary-900/30 rounded-full">
+              <CreditCard className="h-6 w-6 text-primary-600 dark:text-primary-400" />
+            </div>
+            <div className="text-left">
+              <h3 className="font-medium">Онлайн оплата</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Оплатите сейчас картой или электронным кошельком
+              </p>
+            </div>
+          </button>
         )}
         
         <button
