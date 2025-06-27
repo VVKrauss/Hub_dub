@@ -5,7 +5,7 @@ import { ru } from 'date-fns/locale';
 import { Calendar, ChevronLeft, ChevronRight, Plus, Edit, Trash2, Users, Clock, MapPin, Grid, List, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'react-hot-toast';
-import { useTimeUtils } from '../../hooks/useTimeUtils';
+// Удаляем импорт useTimeUtils
 
 // === ТИПЫ ===
 interface TimeSlot {
@@ -51,6 +51,20 @@ const AdminCalendarPage: React.FC = () => {
   const [newSlotHour, setNewSlotHour] = useState<number | null>(null);
 
   // === УТИЛИТЫ ===
+  const formatSlotTime = (timestamp: string): string => {
+    const date = new Date(timestamp);
+    return date.toLocaleString('sr-RS', {
+      timeZone: 'Europe/Belgrade',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+  };
+
+  const isSlotPast = (endTimestamp: string): boolean => {
+    return new Date(endTimestamp) < new Date();
+  };
+
   const getSlotColorClasses = (type: string, status?: string, isPast: boolean = false) => {
     if (isPast) {
       return 'bg-gray-100 dark:bg-gray-800 border-l-4 border-gray-400 opacity-60';
@@ -184,7 +198,7 @@ const AdminCalendarPage: React.FC = () => {
     style?: React.CSSProperties;
     className?: string;
   }) => {
-    const { formatSlotTime, isSlotPast } = useTimeUtils();
+    const { formatSlotTime, isSlotPast } = { formatSlotTime, isSlotPast };
     const isPastSlot = isSlotPast(slot.end_at);
     
     const firstSlot = groupedSlot?.slots[0] || slot;
