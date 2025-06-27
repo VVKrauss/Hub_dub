@@ -252,11 +252,23 @@ const RegistrationModal = ({ isOpen, onClose, event }: RegistrationModalProps) =
         phone: formData.phone,
         comment: formData.comment,
         adult_tickets: Number(formData.adultTickets),
-        child_tickets: Number(isAdultsOnly ? 0 : formData.childTickets), // Обновлено
+        child_tickets: Number(isAdultsOnly ? 0 : formData.childTickets), // Исправлено: используем isAdultsOnly
         total_amount: total,
         status: true,
         created_at: new Date().toISOString()
       };
+
+      const { data, error } = await supabase
+        .from('event_registrations')
+        .insert({
+          event_id: event.id,
+          user_id: currentUser?.id || null,
+          ...registrationData
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
 
       const { data, error } = await supabase
         .from('event_registrations')
@@ -537,7 +549,7 @@ const RegistrationModal = ({ isOpen, onClose, event }: RegistrationModalProps) =
                         <span>{calculateTotal()} {event.currency}</span>
                       </div>
                     </div>
-                  </div> 
+                  </div>
                 </div>
               )}
 
