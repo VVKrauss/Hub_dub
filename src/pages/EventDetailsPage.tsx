@@ -622,20 +622,39 @@ const EventDetailsPage = () => {
         </div>
       </main>
 
-      <RegistrationModal
-        isOpen={showRegistrationModal}
-        onClose={() => setShowRegistrationModal(false)}
-        event={event}
-      />
+      
+     {/*  В EventDetailsPage.tsx - обновленная передача пропсов в RegistrationModal */}
+<RegistrationModal
+  isOpen={showRegistrationModal}
+  onClose={() => setShowRegistrationModal(false)}
+  event={{
+    id: event.id,
+    title: event.title,
+    start_at: event.start_at,
+    location: event.location || '',
+    price: event.price || 0,
+    currency: event.currency || 'RUB',
+    payment_type: event.payment_type,
+    payment_link: event.payment_link,
+    payment_widget_id: event.payment_widget_id,
+    widget_chooser: event.widget_chooser,
+    couple_discount: event.couple_discount,
+    child_half_price: event.child_half_price,
+    age_category: event.age_category, // Передаем возрастную категорию вместо adults_only
+    registrations: event.registrations
+  }}
+/>
 
-      <PaymentOptionsModal
-        isOpen={showPaymentOptions}
-        onClose={() => setShowPaymentOptions(false)}
-        onSelectOption={handlePaymentOptionSelect}
-        hasOnlinePayment={event.payment_type !== 'free' && event.payment_type !== 'donation'}
-        paymentType={event.payment_type === 'widget' ? 'widget' : 'link'}
-        paymentLink={event.payment_link}
-      />
+// Также в PaymentOptionsModal
+<PaymentOptionsModal
+  isOpen={showPaymentOptions}
+  onClose={() => setShowPaymentOptions(false)}
+  onSelectOption={handlePaymentOptionSelect}
+  hasOnlinePayment={event.payment_type !== 'free' && event.payment_type !== 'donation'}
+  paymentType={event.widget_chooser ? 'widget' : 'link'}
+  paymentLink={event.payment_link}
+  oblakkarteDataEventId={event.oblakkarte_data_event_id}
+/>
     </Layout>
   );
 };
