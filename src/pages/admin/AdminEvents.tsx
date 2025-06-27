@@ -305,15 +305,19 @@ const AdminEvents = () => {
         </div>
 
         {/* Кнопка создания */}
-        <div className="flex justify-center mb-10">
-          <Link 
-            to="/admin/events/new"
-            className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white font-semibold rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg font-heading"
-          >
-            <Plus className="w-5 h-5" />
-            Создать мероприятие
-          </Link>
-        </div>
+       // Замените кнопку создания мероприятия:
+<div className="flex justify-center mb-10">
+  <Link to="/admin/events/new" className="inline-block">
+    <Button
+      variant="primary"
+      size="lg"
+      leftIcon={<Plus className="h-5 w-5" />}
+      className="bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 shadow-xl"
+    >
+      Создать мероприятие
+    </Button>
+  </Link>
+</div
 
         {/* Поиск и фильтры */}
         <div className="bg-white dark:bg-dark-800 rounded-2xl shadow-lg mb-8 border border-gray-100 dark:border-gray-700">
