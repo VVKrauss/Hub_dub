@@ -324,11 +324,11 @@ const CreateEditEventPage = () => {
   const validateForm = (): boolean => {
     const newErrors: Record<string, boolean> = {};
 
-    if (!event.title.trim()) newErrors.title = true;
-    if (!event.description.trim()) newErrors.description = true;
+    if (!event.title || !event.title.trim()) newErrors.title = true;
+    if (!event.description || !event.description.trim()) newErrors.description = true;
     if (!event.start_at) newErrors.start_at = true;
     if (!event.end_at) newErrors.end_at = true;
-    if (!event.location.trim()) newErrors.location = true;
+    if (!event.location || !event.location.trim()) newErrors.location = true;
 
     // Проверка времени
     if (event.start_at && event.end_at) {
@@ -481,7 +481,6 @@ const CreateEditEventPage = () => {
     
     return eventData;
   };
-
   // src/pages/admin/CreateEditEventPage.tsx - Готовая часть 4
 
   // Отправка формы
