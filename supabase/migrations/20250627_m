@@ -1,0 +1,84 @@
+-- Миграция для добавления поля oblakkarte_data_event_id
+-- Файл: supabase/migrations/add_oblakkarte_data_event_id.sql
+
+-- Добавляем поле для ID события Oblakkarte
+ALTER TABLE events 
+ADD COLUMN IF NOT EXISTS oblakkarte_data_event_id VARCHAR(50) DEFAULT NULL;
+
+-- Создаем индекс для поиска по ID события
+CREATE INDEX IF NOT EXISTS idx_events_oblakkarte_data_event_id 
+ON events(oblakkarte_data_event_id) 
+WHERE oblakkarte_data_event_id IS NOT NULL;
+
+-- Добавляем комментарий для документации
+COMMENT ON COLUMN events.oblakkarte_data_event_id IS 'ID события в системе Oblakkarte для виджета оплаты (data-event-id, например: DoYnhURt)';
+
+-- Обновляем функцию валидации для учета нового поля
+CREATE OR REPLACE FUNCTION public.validate_registration_data()
+RETURNS TRIGGER AS $$
+DECLARE
+    reg_item JSONB;
+    calculated_total INTEGER := 0;
+    calculated_adults INTEGER := 0;
+    calculated_children INTEGER := 0;
+    adult_tix INTEGER;
+    child_tix INTEGER;
+BEGIN
+    -- Initialize registrations if NULL
+    IF NEW.registrations IS NULL THEN
+        NEW.registrations := jsonb_build_object(
+            'max_regs', COALESCE(NEW.max_registrations, 40),
+            'current', 0,
+            'current_adults', 0,
+            'current_children', 0,
+            'reg_list', '[]'::jsonb
+        );
+    END IF;
+
+    -- Ensure max_regs has a default value
+    IF NEW.registrations->'max_regs' IS NULL THEN
+        NEW.registrations := jsonb_set(NEW.registrations, '{max_regs}', to_jsonb(COALESCE(NEW.max_registrations, 40)));
+    END IF;
+
+    -- Skip calculation if reg_list is empty or null
+    IF NEW.registrations->'reg_list' IS NULL OR jsonb_array_length(NEW.registrations->'reg_list') = 0 THEN
+        NEW.registrations := jsonb_set(NEW.registrations, '{current}', '0');
+        NEW.registrations := jsonb_set(NEW.registrations, '{current_adults}', '0');
+        NEW.registrations := jsonb_set(NEW.registrations, '{current_children}', '0');
+        NEW.current_registration_count := 0;
+        RETURN NEW;
+    END IF;
+
+    -- Calculate totals from active registrations
+    FOR reg_item IN SELECT * FROM jsonb_array_elements(NEW.registrations->'reg_list')
+    LOOP
+        -- Only count active registrations
+        IF (reg_item->>'status')::boolean = true THEN
+            adult_tix := COALESCE((reg_item->>'adult_tickets')::INTEGER, 0);
+            child_tix := COALESCE((reg_item->>'child_tickets')::INTEGER, 0);
+            
+            calculated_adults := calculated_adults + adult_tix;
+            calculated_children := calculated_children + child_tix;
+            calculated_total := calculated_total + adult_tix + child_tix;
+        END IF;
+    END LOOP;
+
+    -- Update registration counts
+    NEW.registrations := jsonb_set(NEW.registrations, '{current}', to_jsonb(calculated_total));
+    NEW.registrations := jsonb_set(NEW.registrations, '{current_adults}', to_jsonb(calculated_adults));
+    NEW.registrations := jsonb_set(NEW.registrations, '{current_children}', to_jsonb(calculated_children));
+
+    -- For backward compatibility
+    NEW.current_registration_count := calculated_total;
+
+    -- Check against max_regs if set
+    IF NEW.registrations->'max_regs' IS NOT NULL AND (NEW.registrations->>'max_regs')::INTEGER > 0 THEN
+        IF calculated_total > (NEW.registrations->>'max_regs')::INTEGER THEN
+            RAISE EXCEPTION 'Validation error: Total tickets (%) exceeds maximum registrations (%)', 
+                calculated_total, (NEW.registrations->>'max_regs')::INTEGER;
+        END IF;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
