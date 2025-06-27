@@ -210,7 +210,7 @@ const CoworkingPage = () => {
   if (loading) {
     return (
       <Layout>
-        <PageHeader title="Загрузка...\" description="Загружаем данные о коворкинге" />
+        <PageHeader title="Загрузка..." description="Загружаем данные о коворкинге" />
         <div className="section bg-gray-50 dark:bg-dark-800">
           <div className="container">
             <div className="animate-pulse space-y-4 py-12">
@@ -317,118 +317,121 @@ const CoworkingPage = () => {
       </main>
 
       {/* Модальное окно бронирования */}
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
-        <div className="p-6">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-            Бронирование: {selectedService?.name}
-          </h2>
-          
-          {submitStatus === 'success' ? (
-            <div className="text-center py-8">
-              <div className="text-green-500 text-5xl mb-4">✓</div>
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                Заявка отправлена!
-              </h3>
-              <p className="text-gray-600 dark:text-gray-300">
-                Мы свяжемся с вами в ближайшее время.
-              </p>
+      <Modal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)}
+        title={selectedService ? `Бронирование: ${selectedService.name}` : "Бронирование"}
+        size="md"
+        closeOnOverlayClick={!isSubmitting}
+        closeOnEsc={!isSubmitting}
+      >
+        {submitStatus === 'success' ? (
+          <div className="text-center py-8">
+            <div className="text-green-500 text-5xl mb-4">✓</div>
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              Заявка отправлена!
+            </h3>
+            <p className="text-gray-600 dark:text-gray-300">
+              Мы свяжемся с вами в ближайшее время.
+            </p>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit}>
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Ваше имя <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  id="name"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleInputChange}
+                  className={`form-input ${formErrors.name ? 'border-red-500' : ''}`}
+                  placeholder="Введите ваше имя"
+                />
+                {formErrors.name && (
+                  <p className="mt-1 text-sm text-red-500">Это поле обязательно для заполнения</p>
+                )}
+              </div>
+              
+              <div>
+                <label htmlFor="contact" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Email или другой способ связи
+                </label>
+                <input
+                  type="text"
+                  id="contact"
+                  name="contact"
+                  value={formData.contact}
+                  onChange={handleInputChange}
+                  className="form-input"
+                  placeholder="example@email.com или @telegram"
+                />
+              </div>
+              
+              <div>
+                <label htmlFor="phone" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Телефон <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  id="phone"
+                  name="phone"
+                  value={formData.phone}
+                  onChange={handleInputChange}
+                  className={`form-input ${formErrors.phone ? 'border-red-500' : ''}`}
+                  placeholder="+7 (123) 456-78-90"
+                />
+                {formErrors.phone && (
+                  <p className="mt-1 text-sm text-red-500">Это поле обязательно для заполнения</p>
+                )}
+              </div>
+              
+              <div>
+                <label htmlFor="comment" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Комментарий
+                </label>
+                <textarea
+                  id="comment"
+                  name="comment"
+                  value={formData.comment}
+                  onChange={handleInputChange}
+                  className="form-textarea"
+                  rows={3}
+                  placeholder="Напишите, когда бы вам хотелось у нас поработать"
+                />
+              </div>
             </div>
-          ) : (
-            <form onSubmit={handleSubmit}>
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Ваше имя <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    id="name"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    className={`w-full px-3 py-2 border rounded-lg ${formErrors.name ? 'border-red-500' : 'border-gray-300 dark:border-dark-600'} bg-white dark:bg-dark-800`}
-                    placeholder="Иван Иванов"
-                  />
-                  {formErrors.name && (
-                    <p className="mt-1 text-sm text-red-500">Это поле обязательно для заполнения</p>
-                  )}
-                </div>
-                
-                <div>
-                  <label htmlFor="contact" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Контакт (соцсеть или почта)
-                  </label>
-                  <input
-                    type="text"
-                    id="contact"
-                    name="contact"
-                    value={formData.contact}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-800"
-                    placeholder="telegram: @username или email@example.com"
-                  />
-                </div>
-                
-                <div>
-                  <label htmlFor="phone" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Телефон <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="tel"
-                    id="phone"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                    className={`w-full px-3 py-2 border rounded-lg ${formErrors.phone ? 'border-red-500' : 'border-gray-300 dark:border-dark-600'} bg-white dark:bg-dark-800`}
-                    placeholder="+7 (123) 456-78-90"
-                  />
-                  {formErrors.phone && (
-                    <p className="mt-1 text-sm text-red-500">Это поле обязательно для заполнения</p>
-                  )}
-                </div>
-                
-                <div>
-                  <label htmlFor="comment" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Комментарий
-                  </label>
-                  <textarea
-                    id="comment"
-                    name="comment"
-                    value={formData.comment}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-dark-600 rounded-lg bg-white dark:bg-dark-800"
-                    rows={3}
-                    placeholder="Напишите, когда бы вам хотелось у нас поработать"
-                  />
-                </div>
+            
+            <div className="mt-6 flex gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsModalOpen(false)}
+                disabled={isSubmitting}
+                fullWidth
+              >
+                Отмена
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                loading={isSubmitting}
+                fullWidth
+              >
+                {isSubmitting ? 'Отправка...' : 'Отправить заявку'}
+              </Button>
+            </div>
+            
+            {submitStatus === 'error' && (
+              <div className="mt-4 p-3 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-lg text-sm">
+                Произошла ошибка при отправке. Пожалуйста, попробуйте позже.
               </div>
-              
-              <div className="mt-6 flex justify-end space-x-3">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 border border-gray-300 dark:border-dark-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-dark-700 transition-colors"
-                  disabled={isSubmitting}
-                >
-                  Отмена
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors disabled:opacity-50"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? 'Отправка...' : 'Отправить заявку'}
-                </button>
-              </div>
-              
-              {submitStatus === 'error' && (
-                <div className="mt-4 p-3 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-lg text-sm">
-                  Произошла ошибка при отправке. Пожалуйста, попробуйте позже.
-                </div>
-              )}
-            </form>
-          )}
-        </div>
+            )}
+          </form>
+        )}
       </Modal>
     </Layout>
   );
@@ -490,12 +493,12 @@ const ServiceCard = ({
               / {getPeriodText()}
             </span>
           </div>
-          <button 
+          <Button
+            variant="primary"
             onClick={onBookClick}
-            className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
           >
             Забронировать
-          </button>
+          </Button>
         </div>
       </div>
     </div>
