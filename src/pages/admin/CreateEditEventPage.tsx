@@ -976,210 +976,195 @@ const CreateEditEventPage = () => {
           </div>
         </div>
 
-        <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-dark-600 p-6">
-          <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
-            <DollarSign className="h-5 w-5 text-primary-600" />
-            Информация об оплате
-          </h2>
-          
-          <div className="space-y-6">
-            <div className="form-group">
-              <label className="block font-medium mb-3 text-gray-700 dark:text-gray-300">
-                Тип оплаты
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {paymentTypes.map(type => (
-                  <button
-                    key={type}
-                    type="button"
-                    onClick={() => setEvent(prev => ({ ...prev, payment_type: type }))}
-                    className={`p-4 rounded-xl border-2 text-center transition-all duration-200 ${
-                      event.payment_type === type
-                        ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
-                        : 'border-gray-200 dark:border-dark-600 bg-gray-50 dark:bg-dark-700 text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-dark-500'
-                    }`}
-                  >
-                    <div className="font-semibold text-lg mb-1">
-                      {type === 'cost' ? '💰 Платное' : 
-                       type === 'free' ? '🆓 Бесплатное' : 
-                       '💝 Донейшн'}
-                    </div>
-                    <div className="text-sm opacity-75">
-                      {type === 'cost' ? 'Фиксированная цена' : 
-                       type === 'free' ? 'Без оплаты' : 
-                       'Добровольные взносы'}
-                    </div>
-                  </button>
-                ))}
-              </div>
+      // Секция информации об оплате для CreateEditEventPage
+<div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-dark-600 p-6">
+  <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
+    <DollarSign className="h-5 w-5 text-primary-600" />
+    Информация об оплате
+  </h2>
+  
+  <div className="space-y-6">
+    {/* Тип оплаты */}
+    <div className="form-group">
+      <label className="block font-medium mb-3 text-gray-700 dark:text-gray-300">
+        Тип оплаты
+      </label>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {paymentTypes.map(type => (
+          <button
+            key={type}
+            type="button"
+            onClick={() => setEvent(prev => ({ ...prev, payment_type: type }))}
+            className={`p-4 rounded-xl border-2 text-center transition-all duration-200 ${
+              event.payment_type === type
+                ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
+                : 'border-gray-200 dark:border-dark-600 bg-gray-50 dark:bg-dark-700 text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-dark-500'
+            }`}
+          >
+            <div className="font-semibold text-lg mb-1">
+              {type === 'cost' ? '💰 Платное' : 
+               type === 'free' ? '🆓 Бесплатное' : 
+               '💝 Донейшн'}
             </div>
-            
-            {event.payment_type === 'cost' && (
-              <>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="form-group">
-                    <label htmlFor="price" className="block font-medium mb-2 text-gray-700 dark:text-gray-300">
-                      Цена
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        id="price"
-                        name="price"
-                        value={event.price}
-                        onChange={handleInputChange}
-                        className={`w-full px-4 py-3 pr-16 rounded-lg border transition-colors ${
-                          errors.price 
-                            ? 'border-red-500 focus:border-red-500' 
-                            : 'border-gray-300 dark:border-dark-600 focus:border-primary-500'
-                        } bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800`}
-                        placeholder="Оставьте пустым для оплаты только онлайн"
-                        min="0"
-                        step="100"
-                      />
-                      <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
-                        <span className="text-gray-500 font-medium">{event.currency}</span>
-                      </div>
-                    </div>
-                    {errors.price && errors.payment_link && (
-                      <p className="text-red-500 text-sm mt-2">
-                        Для активных мероприятий необходимо указать либо цену, либо ссылку на оплату
-                      </p>
-                    )}
-                    <p className="text-gray-500 text-sm mt-2">
-                      Оставьте пустым для оплаты только онлайн
-                    </p>
-                  </div>
-                  
-                  <div className="form-group">
-                    <label htmlFor="currency" className="block font-medium mb-2 text-gray-700 dark:text-gray-300">
-                      Валюта
-                    </label>
-                    <select
-                      id="currency"
-                      name="currency"
-                      value={event.currency}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-dark-600 bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800 transition-colors"
-                    >
-                      {currencies.map(currency => (
-                        <option key={currency} value={currency}>{currency}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="form-group">
-                    <label htmlFor="couple_discount" className="block font-medium mb-2 text-gray-700 dark:text-gray-300">
-                      Скидка для пар (%)
-                    </label>
-                    <input
-                      type="number"
-                      id="couple_discount"
-                      name="couple_discount"
-                      value={event.couple_discount}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-dark-600 bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800 transition-colors"
-                      placeholder="Например: 10"
-                      min="0"
-                      max="100"
-                    />
-                  </div>
-                  
-                  <div className="form-group flex items-end">
-                    <label className="flex items-center gap-3 p-4 rounded-lg border border-gray-200 dark:border-dark-600 hover:bg-gray-50 dark:hover:bg-dark-700 cursor-pointer transition-colors w-full">
-                      <input
-                        type="checkbox"
-                        name="child_half_price"
-                        checked={event.child_half_price}
-                        onChange={handleCheckboxChange}
-                        className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 transition-colors"
-                      />
-                      <span className="text-gray-700 dark:text-gray-300 font-medium">
-                        Детский билет за полцены
-                      </span>
-                    </label>
-                  </div>
-                </div>
-              </>
-            )}
-            
-            <div className="form-group">
-              <label htmlFor="payment_link" className="block font-medium mb-2 text-gray-700 dark:text-gray-300">
-                <Link className="h-4 w-4 inline mr-2" />
-                Ссылка на оплату
-              </label>
-              <input
-                type="url"
-                id="payment_link"
-                name="payment_link"
-                value={event.payment_link}
-                onChange={handleInputChange}
-                className={`w-full px-4 py-3 rounded-lg border transition-colors ${
-                  errors.payment_link 
-                    ? 'border-red-500 focus:border-red-500' 
-                    : 'border-gray-300 dark:border-dark-600 focus:border-primary-500'
-                } bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800`}
-                placeholder="https://..."
-              />
-              {errors.price && errors.payment_link && (
-                <p className="text-red-500 text-sm mt-2">
-                  Для активных мероприятий необходимо указать либо цену, либо ссылку на оплату
-                </p>
-              )}
+            <div className="text-sm opacity-75">
+              {type === 'cost' ? 'Фиксированная цена' : 
+               type === 'free' ? 'Без оплаты' : 
+               'Добровольные взносы'}
             </div>
-            
-            <div className="form-group">
-              <label htmlFor="payment_widget_id" className="block font-medium mb-2 text-gray-700 dark:text-gray-300">
-                ID виджета оплаты
-              </label>
-              <textarea
-                id="payment_widget_id"
-                name="payment_widget_id"
-                value={event.payment_widget_id}
-                onChange={handleInputChange}
-                rows={3}
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-dark-600 bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800 transition-colors resize-vertical"
-                placeholder="ID виджета или HTML-код"
-              />
-            </div>
-            
-            <div className="form-group">
-              <label className="block font-medium mb-3 text-gray-700 dark:text-gray-300">
-                Виджет оплаты
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setEvent(prev => ({ ...prev, widget_chooser: false }))}
-                  className={`p-4 rounded-xl border-2 text-center transition-all duration-200 ${
-                    !event.widget_chooser
-                      ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
-                      : 'border-gray-200 dark:border-dark-600 bg-gray-50 dark:bg-dark-700 text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-dark-500'
-                  }`}
-                >
-                  <div className="font-semibold text-lg mb-1">🔗 Ссылка</div>
-                  <div className="text-sm opacity-75">Переход по ссылке</div>
-                </button>
-                
-                <button
-                  type="button"
-                  onClick={() => setEvent(prev => ({ ...prev, widget_chooser: true }))}
-                  className={`p-4 rounded-xl border-2 text-center transition-all duration-200 ${
-                    event.widget_chooser
-                      ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
-                      : 'border-gray-200 dark:border-dark-600 bg-gray-50 dark:bg-dark-700 text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-dark-500'
-                  }`}
-                >
-                  <div className="font-semibold text-lg mb-1">🛠️ Виджет</div>
-                  <div className="text-sm opacity-75">Встроенная форма</div>
-                </button>
-              </div>
+          </button>
+        ))}
+      </div>
+    </div>
+    
+    {/* Цена и валюта для платных мероприятий */}
+    {event.payment_type === 'cost' && (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="form-group">
+          <label htmlFor="price" className="block font-medium mb-2 text-gray-700 dark:text-gray-300">
+            Цена
+          </label>
+          <div className="relative">
+            <input
+              type="number"
+              id="price"
+              name="price"
+              value={event.price || ''}
+              onChange={handleInputChange}
+              className={`w-full px-4 py-3 pr-16 rounded-lg border transition-colors ${
+                errors.price 
+                  ? 'border-red-500 focus:border-red-500' 
+                  : 'border-gray-300 dark:border-dark-600 focus:border-primary-500'
+              } bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800`}
+              placeholder="0"
+              min="0"
+              step="100"
+            />
+            <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+              <span className="text-gray-500 font-medium">{event.currency}</span>
             </div>
           </div>
         </div>
-
+        
+        <div className="form-group">
+          <label htmlFor="currency" className="block font-medium mb-2 text-gray-700 dark:text-gray-300">
+            Валюта
+          </label>
+          <select
+            id="currency"
+            name="currency"
+            value={event.currency}
+            onChange={handleInputChange}
+            className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-dark-600 bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800"
+          >
+            <option value="RUB">RUB (₽)</option>
+            <option value="EUR">EUR (€)</option>
+            <option value="USD">USD ($)</option>
+          </select>
+        </div>
+      </div>
+    )}
+    
+    {/* Настройки онлайн оплаты */}
+    {event.payment_type !== 'free' && (
+      <>
+        <div className="form-group">
+          <label className="block font-medium mb-3 text-gray-700 dark:text-gray-300">
+            Онлайн оплата
+          </label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => setEvent(prev => ({ ...prev, widget_chooser: false }))}
+              className={`p-4 rounded-xl border-2 text-center transition-all duration-200 ${
+                !event.widget_chooser
+                  ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
+                  : 'border-gray-200 dark:border-dark-600 bg-gray-50 dark:bg-dark-700 text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-dark-500'
+              }`}
+            >
+              <div className="font-semibold text-lg mb-1">🔗 Ссылка</div>
+              <div className="text-sm opacity-75">Переход по ссылке</div>
+            </button>
+            
+            <button
+              type="button"
+              onClick={() => setEvent(prev => ({ ...prev, widget_chooser: true }))}
+              className={`p-4 rounded-xl border-2 text-center transition-all duration-200 ${
+                event.widget_chooser
+                  ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
+                  : 'border-gray-200 dark:border-dark-600 bg-gray-50 dark:bg-dark-700 text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-dark-500'
+              }`}
+            >
+              <div className="font-semibold text-lg mb-1">🛠️ Виджет</div>
+              <div className="text-sm opacity-75">Встроенная форма</div>
+            </button>
+          </div>
+        </div>
+        
+        {!event.widget_chooser ? (
+          // Поле для ссылки на оплату
+          <div className="form-group">
+            <label htmlFor="payment_link" className="block font-medium mb-2 text-gray-700 dark:text-gray-300">
+              Ссылка на оплату
+            </label>
+            <input
+              type="url"
+              id="payment_link"
+              name="payment_link"
+              value={event.payment_link || ''}
+              onChange={handleInputChange}
+              className={`w-full px-4 py-3 rounded-lg border transition-colors ${
+                errors.payment_link 
+                  ? 'border-red-500 focus:border-red-500' 
+                  : 'border-gray-300 dark:border-dark-600 focus:border-primary-500'
+              } bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800`}
+              placeholder="https://..."
+            />
+          </div>
+        ) : (
+          // Поле для ID события Oblakkarte
+          <div className="form-group">
+            <label htmlFor="oblakkarte_data_event_id" className="block font-medium mb-2 text-gray-700 dark:text-gray-300">
+              ID события Oblakkarte
+            </label>
+            <input
+              type="text"
+              id="oblakkarte_data_event_id"
+              name="oblakkarte_data_event_id"
+              value={event.oblakkarte_data_event_id || ''}
+              onChange={handleInputChange}
+              className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-dark-600 bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800 transition-colors"
+              placeholder="Например: DoYnhURt"
+            />
+            <p className="text-gray-500 text-sm mt-2">
+              ID события из панели Oblakkarte для интеграции виджета оплаты
+            </p>
+          </div>
+        )}
+      </>
+    )}
+    
+    {/* Количество возможных регистраций */}
+    <div className="form-group">
+      <label htmlFor="max_registrations" className="block font-medium mb-2 text-gray-700 dark:text-gray-300">
+        Максимальное количество участников
+      </label>
+      <input
+        type="number"
+        id="max_registrations"
+        name="max_registrations"
+        value={event.max_registrations || 40}
+        onChange={handleInputChange}
+        className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-dark-600 bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800 transition-colors"
+        placeholder="40"
+        min="1"
+        step="1"
+      />
+      <p className="text-gray-500 text-sm mt-2">
+        Максимальное количество участников для регистрации на мероприятие
+      </p>
+    </div>
+  </div>
+</div>
         <EventSpeakersSection
           selectedSpeakerIds={event.speakers}
           hideSpeakersGallery={event.hide_speakers_gallery}
