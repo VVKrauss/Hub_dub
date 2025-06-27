@@ -25,7 +25,7 @@ const PaymentWidgetModal = ({ isOpen, onClose, widgetId }: PaymentWidgetModalPro
         if (!existingScript) {
           const script = document.createElement('script');
           script.src = 'https://widget.oblakkarte.rs/widget.js';
-          script.setAttribute('data-organizer-public-token', widgetId);
+          script.setAttribute('data-organizer-public-token', 'Yi0idjZg');
           script.async = true;
           
           script.onload = () => {
@@ -37,10 +37,10 @@ const PaymentWidgetModal = ({ isOpen, onClose, widgetId }: PaymentWidgetModalPro
             setIsLoading(false);
           };
           
-          containerRef.current.appendChild(script);
+          document.head.appendChild(script);
         } else {
           // Если скрипт уже загружен, просто обновляем атрибут
-          existingScript.setAttribute('data-organizer-public-token', widgetId);
+          existingScript.setAttribute('data-organizer-public-token', 'Yi0idjZg');
           setIsLoading(false);
         }
       } catch (err) {

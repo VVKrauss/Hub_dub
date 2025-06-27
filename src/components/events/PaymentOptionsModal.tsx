@@ -1,5 +1,5 @@
+import { useState, useEffect } from 'react';
 import { CreditCard, MapPin, Loader2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
 import Modal from '../ui/Modal';
 
 type PaymentOptionsModalProps = {
