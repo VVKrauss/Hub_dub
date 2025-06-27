@@ -1,6 +1,7 @@
 import { CreditCard, MapPin } from 'lucide-react';
 import { useEffect } from 'react';
-import Modal from '../ui/Modal';
+import { Modal } from '../../shared/ui/Modal/Modal';
+import { Button } from '../../shared/ui/Button/Button';
 
 type PaymentOptionsModalProps = {
   isOpen: boolean;
@@ -78,14 +79,14 @@ const PaymentOptionsModal = ({
         {hasOnlinePayment && (
           <button
             onClick={handleOnlinePayment}
-            className="w-full p-4 border-2 border-primary-500 rounded-lg hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors flex items-center gap-4"
+            className="w-full p-4 border-2 border-primary-500 rounded-lg hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors flex items-center gap-4 text-left"
           >
-            <div className="p-2 bg-primary-100 dark:bg-primary-900/30 rounded-full">
+            <div className="p-3 bg-primary-100 dark:bg-primary-900/30 rounded-full flex-shrink-0">
               <CreditCard className="h-6 w-6 text-primary-600 dark:text-primary-400" />
             </div>
-            <div className="text-left">
-              <h3 className="font-medium">Онлайн оплата</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
+            <div className="flex-1">
+              <h3 className="font-medium text-gray-900 dark:text-white">Онлайн оплата</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                 Оплатите сейчас картой или электронным кошельком
               </p>
             </div>
@@ -94,26 +95,29 @@ const PaymentOptionsModal = ({
         
         <button
           onClick={() => onSelectOption('venue')}
-          className="w-full p-4 border-2 border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-dark-700 transition-colors flex items-center gap-4"
+          className="w-full p-4 border-2 border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-dark-700 transition-colors flex items-center gap-4 text-left"
         >
-          <div className="p-2 bg-gray-100 dark:bg-gray-700 rounded-full">
+          <div className="p-3 bg-gray-100 dark:bg-gray-700 rounded-full flex-shrink-0">
             <MapPin className="h-6 w-6 text-gray-600 dark:text-gray-400" />
           </div>
-          <div className="text-left">
-            <h3 className="font-medium">Оплата на месте</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+          <div className="flex-1">
+            <h3 className="font-medium text-gray-900 dark:text-white">Оплата на месте</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
               Оплатите при посещении мероприятия
             </p>
           </div>
         </button>
       </div>
       
-      <button
-        onClick={onClose}
-        className="mt-6 w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-dark-700 transition-colors"
-      >
-        Отмена
-      </button>
+      <div className="mt-6">
+        <Button
+          variant="outline"
+          fullWidth
+          onClick={onClose}
+        >
+          Отмена
+        </Button>
+      </div>
     </Modal>
   );
 };
