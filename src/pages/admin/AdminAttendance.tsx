@@ -33,4 +33,4 @@ const AdminAttendance = () => {
   );
 };
 
-export default AdminAttendance;
+export default AdminAttendance; 
