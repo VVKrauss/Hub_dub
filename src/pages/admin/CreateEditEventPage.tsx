@@ -5,12 +5,11 @@ import { toast } from 'react-hot-toast';
 import { 
   Info, Calendar, MapPin, Users, Globe, Save, Loader2, 
   Upload, Image as ImageIcon, X, Trash2, AlertTriangle,
-  DollarSign, Tag, Play
+  DollarSign, Tag, Play, Plus
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import EventSpeakersSection from '../../components/admin/EventSpeakersSection';
 import EventFestivalProgramSection from '../../components/admin/EventFestivalProgramSection';
-import PhotoGallerySection from '../../components/admin/PhotoGallerySection';
 
 // Константы
 const TITLE_MAX_LENGTH = 100;
@@ -128,7 +127,6 @@ const getImageUrl = (imagePath: string): string => {
     
   return data.publicUrl;
 };
-
 // src/pages/admin/CreateEditEventPage.tsx - Часть 2
 const CreateEditEventPage = () => {
   const navigate = useNavigate();
