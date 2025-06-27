@@ -547,16 +547,20 @@ const AdminOblakkarteStats: React.FC = () => {
     }
   };
 
-  // Обработчик клика по мероприятию
+  // Закрытие модального окна
+  const closeEventDetails = () => {
+    setSelectedEvent(null);
+    setEventDetails(null);
+  };
   const handleEventClick = (event: OblakkarteEvent) => {
     setSelectedEvent(event);
     fetchEventDetails(event.uuid);
   };
 
-  // Закрытие модального окна
-  const closeEventDetails = () => {
-    setSelectedEvent(null);
-    setEventDetails(null);
+  // Вспомогательная функция для безопасного преобразования в число
+  const safeNumber = (value: any): number => {
+    const num = Number(value);
+    return isNaN(num) ? 0 : num;
   };
 
   const exportToCSV = () => {
@@ -966,7 +970,7 @@ const AdminOblakkarteStats: React.FC = () => {
                           <div>
                             <p className="text-sm text-gray-600 dark:text-gray-300">Общая выручка</p>
                             <p className="text-xl font-bold text-purple-700 dark:text-purple-300">
-                              {eventDetails.data?.reduce((sum, ticket) => sum + ticket.price_paid.amount, 0).toLocaleString()} {eventDetails.data?.[0]?.price_paid.currency.code || 'RSD'}
+                              {eventDetails.data?.reduce((sum, ticket) => sum + safeNumber(ticket.price_paid.amount), 0).toLocaleString()} {eventDetails.data?.[0]?.price_paid.currency.code || 'RSD'}
                             </p>
                           </div>
                         </div>
@@ -988,7 +992,7 @@ const AdminOblakkarteStats: React.FC = () => {
                               acc[promo] = { count: 0, revenue: 0 };
                             }
                             acc[promo].count += 1;
-                            acc[promo].revenue += ticket.price_paid.amount;
+                            acc[promo].revenue += safeNumber(ticket.price_paid.amount);
                             return acc;
                           }, {})
                         ).map(([promo, stats]: [string, any]) => (
@@ -1108,7 +1112,7 @@ const AdminOblakkarteStats: React.FC = () => {
                                   )}
                                 </td>
                                 <td className="py-3 px-2 text-center font-medium">
-                                  {ticket.price_paid.amount.toLocaleString()} {ticket.price_paid.currency.code}
+                                  {safeNumber(ticket.price_paid.amount).toLocaleString()} {ticket.price_paid.currency.code}
                                 </td>
                                 <td className="py-3 px-2">
                                   <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300 capitalize">
