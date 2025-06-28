@@ -805,82 +805,175 @@ const AdminAbout: React.FC = () => {
         </div>
       )}
 
-      {/* Модальное окно для контрибьюторов */}
-      {showContributorForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-dark-800 rounded-xl shadow-xl max-w-md w-full">
-            <div className="p-6 border-b border-gray-200 dark:border-dark-700">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                  {editContributor.id ? 'Редактировать контрибьютора' : 'Добавить контрибьютора'}
-                </h2>
-                <button
-                  onClick={() => setShowContributorForm(false)}
-                  className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
+     // Заменить секцию контрибьюторов в AdminAbout.tsx на:
+
+{/* Контрибьюторы - inline форма */}
+<div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+  <div className="flex items-center justify-between mb-4">
+    <div className="flex items-center gap-2">
+      <Edit className="w-5 h-5 text-gray-500" />
+      <h3 className="text-lg font-medium text-gray-900 dark:text-white">Контрибьюторы</h3>
+    </div>
+  </div>
+
+  {/* Список существующих контрибьюторов */}
+  <div className="space-y-3 mb-4">
+    {aboutData.contributors.map((contributor) => (
+      <div key={contributor.id} className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
+        <div className="flex items-start justify-between">
+          <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Имя
+              </label>
+              <input
+                type="text"
+                value={contributor.name}
+                onChange={(e) => {
+                  setAboutData(prev => ({
+                    ...prev,
+                    contributors: prev.contributors.map(c => 
+                      c.id === contributor.id ? { ...c, name: e.target.value } : c
+                    )
+                  }));
+                }}
+                className="w-full p-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                placeholder="Имя контрибьютора"
+              />
             </div>
-
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Имя *
-                </label>
-                <input
-                  type="text"
-                  value={editContributor.name}
-                  onChange={(e) => setEditContributor(prev => ({ ...prev, name: e.target.value }))}
-                  className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
-                  placeholder="Имя контрибьютора"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Вклад *
-                </label>
-                <input
-                  type="text"
-                  value={editContributor.contribution}
-                  onChange={(e) => setEditContributor(prev => ({ ...prev, contribution: e.target.value }))}
-                  className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
-                  placeholder="Описание вклада"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Веб-сайт
-                </label>
+            
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Вклад
+              </label>
+              <input
+                type="text"
+                value={contributor.contribution}
+                onChange={(e) => {
+                  setAboutData(prev => ({
+                    ...prev,
+                    contributors: prev.contributors.map(c => 
+                      c.id === contributor.id ? { ...c, contribution: e.target.value } : c
+                    )
+                  }));
+                }}
+                className="w-full p-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                placeholder="Описание вклада"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Веб-сайт
+              </label>
+              <div className="flex gap-2">
                 <input
                   type="url"
-                  value={editContributor.website}
-                  onChange={(e) => setEditContributor(prev => ({ ...prev, website: e.target.value }))}
-                  className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                  value={contributor.website || ''}
+                  onChange={(e) => {
+                    setAboutData(prev => ({
+                      ...prev,
+                      contributors: prev.contributors.map(c => 
+                        c.id === contributor.id ? { ...c, website: e.target.value } : c
+                      )
+                    }));
+                  }}
+                  className="flex-1 p-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
                   placeholder="https://example.com"
                 />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4">
                 <button
-                  onClick={() => setShowContributorForm(false)}
-                  className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
+                  onClick={() => deleteContributor(contributor.id!)}
+                  className="p-2 text-gray-400 hover:text-red-600 transition-colors flex-shrink-0"
+                  title="Удалить контрибьютора"
                 >
-                  Отмена
-                </button>
-                <button
-                  onClick={saveContributor}
-                  className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
-                >
-                  {editContributor.id ? 'Обновить' : 'Добавить'}
+                  <Trash2 className="w-4 h-4" />
                 </button>
               </div>
             </div>
           </div>
         </div>
-      )}
+      </div>
+    ))}
+  </div>
+
+  {/* Форма добавления нового контрибьютора */}
+  {showContributorForm ? (
+    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100">
+          Новый контрибьютор
+        </h4>
+        <button
+          onClick={() => setShowContributorForm(false)}
+          className="p-1 text-blue-400 hover:text-blue-600 transition-colors"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+        <div>
+          <input
+            type="text"
+            value={editContributor.name}
+            onChange={(e) => setEditContributor(prev => ({ ...prev, name: e.target.value }))}
+            className="w-full p-2 text-sm border border-blue-200 dark:border-blue-700 rounded-lg bg-white dark:bg-blue-900/30 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+            placeholder="Имя контрибьютора *"
+          />
+        </div>
+        
+        <div>
+          <input
+            type="text"
+            value={editContributor.contribution}
+            onChange={(e) => setEditContributor(prev => ({ ...prev, contribution: e.target.value }))}
+            className="w-full p-2 text-sm border border-blue-200 dark:border-blue-700 rounded-lg bg-white dark:bg-blue-900/30 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+            placeholder="Описание вклада *"
+          />
+        </div>
+        
+        <div>
+          <input
+            type="url"
+            value={editContributor.website || ''}
+            onChange={(e) => setEditContributor(prev => ({ ...prev, website: e.target.value }))}
+            className="w-full p-2 text-sm border border-blue-200 dark:border-blue-700 rounded-lg bg-white dark:bg-blue-900/30 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+            placeholder="https://example.com"
+          />
+        </div>
+      </div>
+      
+      <div className="flex justify-end gap-2">
+        <button
+          onClick={() => {
+            setShowContributorForm(false);
+            setEditContributor({ name: '', contribution: '', website: '' });
+          }}
+          className="px-3 py-2 text-sm text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
+        >
+          Отмена
+        </button>
+        <button
+          onClick={saveContributor}
+          className="px-3 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+        >
+          Добавить
+        </button>
+      </div>
+    </div>
+  ) : (
+    <button
+      onClick={() => {
+        setEditContributor({ name: '', contribution: '', website: '' });
+        setShowContributorForm(true);
+      }}
+      className="w-full p-3 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-gray-500 dark:text-gray-400 hover:border-primary-400 hover:text-primary-600 dark:hover:text-primary-400 transition-all text-sm flex items-center justify-center gap-2"
+    >
+      <Plus className="w-4 h-4" />
+      Добавить контрибьютора
+    </button>
+  )}
+</div>
 
       {/* Модальное окно для платформ поддержки */}
       {showPlatformForm && (
