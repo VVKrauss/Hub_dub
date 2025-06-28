@@ -12,6 +12,7 @@ import {
   formatTimeFromTimestamp, 
   isPastEvent 
 } from '../utils/dateTimeUtils';
+import MigrationUtility from '../utils/migrationUtility';
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
