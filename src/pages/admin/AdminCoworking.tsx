@@ -1,4 +1,4 @@
-// src/pages/admin/AdminCoworking.tsx - Унифицированная версия
+// src/pages/admin/AdminCoworking.tsx - Версия для существующих таблиц
 import React, { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { 
@@ -28,33 +28,17 @@ interface CoworkingService {
   name: string;
   description: string;
   price: number;
-  price_type: 'hourly' | 'daily' | 'monthly' | 'fixed';
-  image?: string;
+  currency: 'euro' | 'кофе' | 'RSD';
+  period: 'час' | 'день' | 'месяц' | 'Страница';
+  image_url?: string;
   active: boolean;
   order: number;
-}
-
-interface CoworkingSettings {
-  title: string;
-  description: string;
-  features: string[];
-  services: CoworkingService[];
-  contact_info: {
-    phone?: string;
-    email?: string;
-    address?: string;
-  };
+  main_service: boolean;
 }
 
 const AdminCoworking: React.FC = () => {
   // Состояния
-  const [settings, setSettings] = useState<CoworkingSettings>({
-    title: '',
-    description: '',
-    features: [],
-    services: [],
-    contact_info: {}
-  });
+  const [services, setServices] = useState<CoworkingService[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -63,59 +47,39 @@ const AdminCoworking: React.FC = () => {
     name: '',
     description: '',
     price: 0,
-    price_type: 'hourly',
+    currency: 'euro',
+    period: 'час',
     active: true,
-    order: 1
+    order: 1,
+    main_service: true
   });
-  const [newFeature, setNewFeature] = useState('');
   const [previewMode, setPreviewMode] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // === ЗАГРУЗКА ДАННЫХ ===
   useEffect(() => {
-    fetchSettings();
+    fetchServices();
   }, []);
 
-  const fetchSettings = async () => {
+  const fetchServices = async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('coworking_settings')
+        .from('coworking_info_table')
         .select('*')
-        .single();
+        .order('order', { ascending: true });
 
-      if (error && error.code !== 'PGRST116') throw error;
-      
-      if (data) {
-        setSettings(data);
-      }
+      if (error) throw error;
+      setServices(data || []);
     } catch (error) {
-      console.error('Error fetching coworking settings:', error);
-      toast.error('Ошибка при загрузке настроек коворкинга');
+      console.error('Error fetching coworking services:', error);
+      toast.error('Ошибка при загрузке услуг коворкинга');
     } finally {
       setLoading(false);
     }
   };
 
   // === ОБРАБОТЧИКИ ===
-  const handleSave = async () => {
-    try {
-      setSaving(true);
-      const { error } = await supabase
-        .from('coworking_settings')
-        .upsert(settings);
-
-      if (error) throw error;
-      
-      toast.success('Настройки коворкинга сохранены');
-    } catch (error) {
-      console.error('Error saving coworking settings:', error);
-      toast.error('Ошибка при сохранении настроек');
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const handleServiceSave = async () => {
     try {
       if (!editData.name.trim() || editData.price < 0) {
@@ -123,49 +87,74 @@ const AdminCoworking: React.FC = () => {
         return;
       }
 
-      const newService = {
-        ...editData,
-        order: editData.order || settings.services.length + 1
+      setSaving(true);
+
+      const serviceData = {
+        name: editData.name,
+        description: editData.description,
+        price: editData.price,
+        currency: editData.currency,
+        period: editData.period,
+        image_url: editData.image_url,
+        active: editData.active,
+        order: editData.order,
+        main_service: editData.main_service
       };
 
+      let result;
       if (editData.id) {
-        // Обновление существующей услуги
-        setSettings(prev => ({
-          ...prev,
-          services: prev.services.map(service => 
-            service.id === editData.id ? newService : service
-          )
-        }));
+        // Обновление
+        result = await supabase
+          .from('coworking_info_table')
+          .update(serviceData)
+          .eq('id', editData.id);
       } else {
-        // Добавление новой услуги
-        setSettings(prev => ({
-          ...prev,
-          services: [...prev.services, { ...newService, id: `service_${Date.now()}` }]
-        }));
+        // Создание
+        result = await supabase
+          .from('coworking_info_table')
+          .insert([serviceData]);
       }
 
+      if (result.error) throw result.error;
+
+      toast.success(editData.id ? 'Услуга обновлена' : 'Услуга создана');
       setShowForm(false);
       setEditData({
         name: '',
         description: '',
         price: 0,
-        price_type: 'hourly',
+        currency: 'euro',
+        period: 'час',
         active: true,
-        order: 1
+        order: 1,
+        main_service: true
       });
+      await fetchServices();
     } catch (error) {
       console.error('Error saving service:', error);
       toast.error('Ошибка при сохранении услуги');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleDeleteService = (serviceId: string) => {
+  const handleDeleteService = async (serviceId: string) => {
     if (!confirm('Удалить услугу?')) return;
 
-    setSettings(prev => ({
-      ...prev,
-      services: prev.services.filter(service => service.id !== serviceId)
-    }));
+    try {
+      const { error } = await supabase
+        .from('coworking_info_table')
+        .delete()
+        .eq('id', serviceId);
+
+      if (error) throw error;
+
+      toast.success('Услуга удалена');
+      await fetchServices();
+    } catch (error) {
+      console.error('Error deleting service:', error);
+      toast.error('Ошибка при удалении услуги');
+    }
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -183,7 +172,7 @@ const AdminCoworking: React.FC = () => {
 
       if (uploadError) throw uploadError;
 
-      setEditData(prev => ({ ...prev, image: fileName }));
+      setEditData(prev => ({ ...prev, image_url: fileName }));
       toast.success('Изображение загружено');
     } catch (error) {
       console.error('Error uploading image:', error);
@@ -193,31 +182,23 @@ const AdminCoworking: React.FC = () => {
     }
   };
 
-  const addFeature = () => {
-    if (!newFeature.trim()) return;
-    
-    setSettings(prev => ({
-      ...prev,
-      features: [...prev.features, newFeature.trim()]
-    }));
-    setNewFeature('');
-  };
-
-  const removeFeature = (index: number) => {
-    setSettings(prev => ({
-      ...prev,
-      features: prev.features.filter((_, i) => i !== index)
-    }));
-  };
-
-  const getPriceTypeLabel = (type: string) => {
+  const getCurrencyLabel = (currency: string) => {
     const labels = {
-      hourly: 'за час',
-      daily: 'за день',
-      monthly: 'за месяц',
-      fixed: 'фиксированная'
+      euro: '€',
+      кофе: '☕',
+      RSD: 'RSD'
     };
-    return labels[type as keyof typeof labels] || type;
+    return labels[currency as keyof typeof labels] || currency;
+  };
+
+  const getPeriodLabel = (period: string) => {
+    const labels = {
+      час: 'за час',
+      день: 'за день',
+      месяц: 'за месяц',
+      Страница: 'фиксированная'
+    };
+    return labels[period as keyof typeof labels] || period;
   };
 
   // === СОСТОЯНИЕ ЗАГРУЗКИ ===
@@ -226,7 +207,7 @@ const AdminCoworking: React.FC = () => {
       <div className="flex justify-center items-center py-12">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-300">Загрузка настроек коворкинга...</p>
+          <p className="text-gray-600 dark:text-gray-300">Загрузка услуг коворкинга...</p>
         </div>
       </div>
     );
@@ -248,67 +229,40 @@ const AdminCoworking: React.FC = () => {
         <div className="container mx-auto px-4 py-16">
           <div className="text-center mb-16">
             <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-6">
-              {settings.title || 'Коворкинг пространство'}
+              Коворкинг пространство
             </h1>
-            <p className="text-lg text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-              {settings.description}
-            </p>
           </div>
 
-          {/* Особенности */}
-          {settings.features.length > 0 && (
-            <div className="mb-16">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-8 text-center">
-                Особенности пространства
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {settings.features.map((feature, index) => (
-                  <div key={index} className="flex items-center gap-3 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm">
-                    <Check className="w-5 h-5 text-green-500 flex-shrink-0" />
-                    <span className="text-gray-700 dark:text-gray-300">{feature}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* Услуги */}
-          {settings.services.filter(s => s.active).length > 0 && (
-            <div className="mb-16">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-8 text-center">
-                Наши услуги
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {settings.services
-                  .filter(service => service.active)
-                  .sort((a, b) => a.order - b.order)
-                  .map((service) => (
-                    <div key={service.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
-                      {service.image && (
-                        <img
-                          src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/images/${service.image}`}
-                          alt={service.name}
-                          className="w-full h-48 object-cover"
-                        />
-                      )}
-                      <div className="p-6">
-                        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-                          {service.name}
-                        </h3>
-                        <p className="text-gray-600 dark:text-gray-300 mb-4">
-                          {service.description}
-                        </p>
-                        <div className="text-2xl font-bold text-primary-600 dark:text-primary-400">
-                          {service.price} € <span className="text-sm font-normal text-gray-500">
-                            {getPriceTypeLabel(service.price_type)}
-                          </span>
-                        </div>
-                      </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {services
+              .filter(service => service.active)
+              .sort((a, b) => a.order - b.order)
+              .map((service) => (
+                <div key={service.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+                  {service.image_url && (
+                    <img
+                      src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/images/${service.image_url}`}
+                      alt={service.name}
+                      className="w-full h-48 object-cover"
+                    />
+                  )}
+                  <div className="p-6">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                      {service.name}
+                    </h3>
+                    <p className="text-gray-600 dark:text-gray-300 mb-4">
+                      {service.description}
+                    </p>
+                    <div className="text-2xl font-bold text-primary-600 dark:text-primary-400">
+                      {service.price} {getCurrencyLabel(service.currency)} <span className="text-sm font-normal text-gray-500">
+                        {getPeriodLabel(service.period)}
+                      </span>
                     </div>
-                  ))}
-              </div>
-            </div>
-          )}
+                  </div>
+                </div>
+              ))}
+          </div>
         </div>
       </div>
     );
@@ -328,7 +282,7 @@ const AdminCoworking: React.FC = () => {
               <div>
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Управление коворкингом</h1>
                 <p className="text-gray-600 dark:text-gray-300 text-sm mt-1">
-                  Услуги: {settings.services.length} | Активных: {settings.services.filter(s => s.active).length}
+                  Услуги: {services.length} | Активных: {services.filter(s => s.active).length}
                 </p>
               </div>
             </div>
@@ -342,316 +296,158 @@ const AdminCoworking: React.FC = () => {
                 Превью
               </button>
               <button
-                onClick={handleSave}
-                disabled={saving}
-                className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {saving ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Сохранение...
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4" />
-                    Сохранить
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-6 space-y-6">
-          {/* Основная информация */}
-          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-4">
-              <Building className="w-5 h-5 text-gray-500" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Основная информация</h3>
-            </div>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Название коворкинга
-                </label>
-                <input
-                  type="text"
-                  value={settings.title}
-                  onChange={(e) => setSettings(prev => ({ ...prev, title: e.target.value }))}
-                  className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
-                  placeholder="Введите название коворкинга"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Описание
-                </label>
-                <textarea
-                  value={settings.description}
-                  onChange={(e) => setSettings(prev => ({ ...prev, description: e.target.value }))}
-                  rows={4}
-                  className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all resize-none"
-                  placeholder="Опишите ваше коворкинг пространство..."
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Особенности */}
-          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-4">
-              <Check className="w-5 h-5 text-gray-500" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Особенности пространства</h3>
-            </div>
-            
-            <div className="space-y-3">
-              {/* Добавление новой особенности */}
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={newFeature}
-                  onChange={(e) => setNewFeature(e.target.value)}
-                  placeholder="Новая особенность"
-                  className="flex-1 p-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-sm"
-                  onKeyPress={(e) => e.key === 'Enter' && addFeature()}
-                />
-                <button
-                  onClick={addFeature}
-                  className="px-3 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
-              </div>
-              
-              {/* Список особенностей */}
-              <div className="space-y-2">
-                {settings.features.map((feature, index) => (
-                  <div key={index} className="flex items-center justify-between bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-600">
-                    <div className="flex items-center gap-2">
-                      <Check className="w-4 h-4 text-green-500" />
-                      <span className="text-gray-900 dark:text-white text-sm">{feature}</span>
-                    </div>
-                    <button
-                      onClick={() => removeFeature(index)}
-                      className="p-1 text-red-500 hover:text-red-700 transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Контактная информация */}
-          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-4">
-              <Users className="w-5 h-5 text-gray-500" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Контактная информация</h3>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Телефон
-                </label>
-                <input
-                  type="tel"
-                  value={settings.contact_info.phone || ''}
-                  onChange={(e) => setSettings(prev => ({
-                    ...prev,
-                    contact_info: { ...prev.contact_info, phone: e.target.value }
-                  }))}
-                  className="w-full p-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-sm"
-                  placeholder="+381 11 123 4567"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={settings.contact_info.email || ''}
-                  onChange={(e) => setSettings(prev => ({
-                    ...prev,
-                    contact_info: { ...prev.contact_info, email: e.target.value }
-                  }))}
-                  className="w-full p-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-sm"
-                  placeholder="info@coworking.com"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Адрес
-                </label>
-                <input
-                  type="text"
-                  value={settings.contact_info.address || ''}
-                  onChange={(e) => setSettings(prev => ({
-                    ...prev,
-                    contact_info: { ...prev.contact_info, address: e.target.value }
-                  }))}
-                  className="w-full p-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-sm"
-                  placeholder="Белград, Сербия"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Услуги */}
-          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <DollarSign className="w-5 h-5 text-gray-500" />
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Услуги коворкинга</h3>
-              </div>
-              <button
                 onClick={() => {
                   setEditData({
                     name: '',
                     description: '',
                     price: 0,
-                    price_type: 'hourly',
+                    currency: 'euro',
+                    period: 'час',
                     active: true,
-                    order: settings.services.length + 1
+                    order: services.length + 1,
+                    main_service: true
                   });
                   setShowForm(true);
                 }}
-                className="flex items-center gap-2 px-3 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors text-sm"
+                className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors font-medium"
               >
                 <Plus className="w-4 h-4" />
                 Добавить услугу
               </button>
             </div>
+          </div>
+        </div>
 
-            {/* Таблица услуг */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                  <thead className="bg-gray-50 dark:bg-gray-700">
+        <div className="p-6">
+          {/* Таблица услуг */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-700">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Услуга
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Цена
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Статус
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Действия
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                  {services.length === 0 ? (
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Услуга
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Цена
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Статус
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Действия
-                      </th>
+                      <td colSpan={4} className="px-6 py-12 text-center">
+                        <div className="flex flex-col items-center">
+                          <Users className="w-12 h-12 text-gray-400 mb-4" />
+                          <h3 className="text-lg font-medium text-gray-600 dark:text-gray-300 mb-2">
+                            Нет услуг
+                          </h3>
+                          <p className="text-gray-500 dark:text-gray-400 mb-4">
+                            Создайте первую услугу для начала работы
+                          </p>
+                          <button
+                            onClick={() => {
+                              setEditData({
+                                name: '',
+                                description: '',
+                                price: 0,
+                                currency: 'euro',
+                                period: 'час',
+                                active: true,
+                                order: 1,
+                                main_service: true
+                              });
+                              setShowForm(true);
+                            }}
+                            className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
+                          >
+                            <Plus className="w-4 h-4" />
+                            Добавить первую услугу
+                          </button>
+                        </div>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                    {settings.services.length === 0 ? (
-                      <tr>
-                        <td colSpan={4} className="px-6 py-12 text-center">
-                          <div className="flex flex-col items-center">
-                            <Users className="w-12 h-12 text-gray-400 mb-4" />
-                            <h3 className="text-lg font-medium text-gray-600 dark:text-gray-300 mb-2">
-                              Нет услуг
-                            </h3>
-                            <p className="text-gray-500 dark:text-gray-400 mb-4">
-                              Создайте первую услугу для начала работы
-                            </p>
-                            <button
-                              onClick={() => {
-                                setEditData({
-                                  name: '',
-                                  description: '',
-                                  price: 0,
-                                  price_type: 'hourly',
-                                  active: true,
-                                  order: 1
-                                });
-                                setShowForm(true);
-                              }}
-                              className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
-                            >
-                              <Plus className="w-4 h-4" />
-                              Добавить первую услугу
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ) : (
-                      settings.services
-                        .sort((a, b) => a.order - b.order)
-                        .map((service) => (
-                          <tr key={service.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                            <td className="px-6 py-4">
-                              <div className="flex items-center">
-                                {service.image && (
-                                  <img
-                                    src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/images/${service.image}`}
-                                    alt={service.name}
-                                    className="w-12 h-12 rounded-lg object-cover mr-4"
-                                  />
-                                )}
-                                <div>
-                                  <h3 className="text-sm font-medium text-gray-900 dark:text-white">
-                                    {service.name}
-                                  </h3>
-                                  <p className="text-sm text-gray-500 dark:text-gray-400 truncate max-w-xs">
-                                    {service.description}
-                                  </p>
-                                  <span className="text-xs text-gray-400">
-                                    Порядок: {service.order}
-                                  </span>
-                                </div>
+                  ) : (
+                    services
+                      .sort((a, b) => a.order - b.order)
+                      .map((service) => (
+                        <tr key={service.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                          <td className="px-6 py-4">
+                            <div className="flex items-center">
+                              {service.image_url && (
+                                <img
+                                  src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/images/${service.image_url}`}
+                                  alt={service.name}
+                                  className="w-12 h-12 rounded-lg object-cover mr-4"
+                                />
+                              )}
+                              <div>
+                                <h3 className="text-sm font-medium text-gray-900 dark:text-white">
+                                  {service.name}
+                                  {service.main_service && (
+                                    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+                                      Основная
+                                    </span>
+                                  )}
+                                </h3>
+                                <p className="text-sm text-gray-500 dark:text-gray-400 truncate max-w-xs">
+                                  {service.description}
+                                </p>
+                                <span className="text-xs text-gray-400">
+                                  Порядок: {service.order}
+                                </span>
                               </div>
-                            </td>
-                            <td className="px-6 py-4">
-                              <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                {service.price} €
-                              </div>
-                              <div className="text-sm text-gray-500 dark:text-gray-400">
-                                {getPriceTypeLabel(service.price_type)}
-                              </div>
-                            </td>
-                            <td className="px-6 py-4">
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                service.active 
-                                  ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' 
-                                  : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-                              }`}>
-                                {service.active ? 'Активна' : 'Неактивна'}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 text-right">
-                              <div className="flex justify-end items-center gap-2">
-                                <button
-                                  onClick={() => {
-                                    setEditData(service);
-                                    setShowForm(true);
-                                  }}
-                                  className="p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                                  title="Редактировать"
-                                >
-                                  <Edit className="w-4 h-4" />
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteService(service.id!)}
-                                  className="p-2 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
-                                  title="Удалить"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="text-sm font-medium text-gray-900 dark:text-white">
+                              {service.price} {getCurrencyLabel(service.currency)}
+                            </div>
+                            <div className="text-sm text-gray-500 dark:text-gray-400">
+                              {getPeriodLabel(service.period)}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              service.active 
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' 
+                                : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                            }`}>
+                              {service.active ? 'Активна' : 'Неактивна'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex justify-end items-center gap-2">
+                              <button
+                                onClick={() => {
+                                  setEditData(service);
+                                  setShowForm(true);
+                                }}
+                                className="p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                title="Редактировать"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteService(service.id!)}
+                                className="p-2 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                                title="Удалить"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -711,7 +507,7 @@ const AdminCoworking: React.FC = () => {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Цена *
@@ -723,23 +519,38 @@ const AdminCoworking: React.FC = () => {
                       className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
                       min="0"
                       step="0.01"
-                      placeholder="0.00"
+                      placeholder="0"
                     />
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Тип цены
+                      Валюта
                     </label>
                     <select
-                      value={editData.price_type}
-                      onChange={(e) => setEditData(prev => ({ ...prev, price_type: e.target.value as any }))}
+                      value={editData.currency}
+                      onChange={(e) => setEditData(prev => ({ ...prev, currency: e.target.value as any }))}
                       className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
                     >
-                      <option value="hourly">За час</option>
-                      <option value="daily">За день</option>
-                      <option value="monthly">За месяц</option>
-                      <option value="fixed">Фиксированная</option>
+                      <option value="euro">€</option>
+                      <option value="кофе">☕</option>
+                      <option value="RSD">RSD</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Период
+                    </label>
+                    <select
+                      value={editData.period}
+                      onChange={(e) => setEditData(prev => ({ ...prev, period: e.target.value as any }))}
+                      className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                    >
+                      <option value="час">За час</option>
+                      <option value="день">За день</option>
+                      <option value="месяц">За месяц</option>
+                      <option value="Страница">Фиксированная</option>
                     </select>
                   </div>
                 </div>
@@ -762,15 +573,15 @@ const AdminCoworking: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Изображение
                   </label>
-                  {editData.image ? (
+                  {editData.image_url ? (
                     <div className="relative">
                       <img
-                        src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/images/${editData.image}`}
+                        src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/images/${editData.image_url}`}
                         alt="Service"
                         className="w-full h-32 object-cover rounded-lg border border-gray-200 dark:border-gray-600"
                       />
                       <button
-                        onClick={() => setEditData(prev => ({ ...prev, image: undefined }))}
+                        onClick={() => setEditData(prev => ({ ...prev, image_url: undefined }))}
                         className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full opacity-80 hover:opacity-100 transition-opacity"
                       >
                         <Trash2 className="w-3 h-3" />
@@ -796,17 +607,32 @@ const AdminCoworking: React.FC = () => {
                   )}
                 </div>
 
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="active"
-                    checked={editData.active}
-                    onChange={(e) => setEditData(prev => ({ ...prev, active: e.target.checked }))}
-                    className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500 dark:focus:ring-primary-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
-                  />
-                  <label htmlFor="active" className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Активная услуга
-                  </label>
+                <div className="space-y-3">
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="active"
+                      checked={editData.active}
+                      onChange={(e) => setEditData(prev => ({ ...prev, active: e.target.checked }))}
+                      className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500"
+                    />
+                    <label htmlFor="active" className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Активная услуга
+                    </label>
+                  </div>
+
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="main_service"
+                      checked={editData.main_service}
+                      onChange={(e) => setEditData(prev => ({ ...prev, main_service: e.target.checked }))}
+                      className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500"
+                    />
+                    <label htmlFor="main_service" className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Основная услуга
+                    </label>
+                  </div>
                 </div>
               </div>
 
@@ -819,9 +645,17 @@ const AdminCoworking: React.FC = () => {
                 </button>
                 <button
                   onClick={handleServiceSave}
-                  className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
+                  disabled={saving}
+                  className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {editData.id ? 'Обновить' : 'Создать'}
+                  {saving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      Сохранение...
+                    </>
+                  ) : (
+                    editData.id ? 'Обновить' : 'Создать'
+                  )}
                 </button>
               </div>
             </div>
