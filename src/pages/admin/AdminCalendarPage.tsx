@@ -93,7 +93,7 @@ const AdminCalendarPage: React.FC = () => {
   };
 
   // === НАВИГАЦИЯ ===
-  const navigate = (direction: 'prev' | 'next') => {
+  const navigate = (direction: 'prev' | 'next') => { 
     setCurrentDate(prevDate => {
       switch (viewMode) {
         case 'day':
