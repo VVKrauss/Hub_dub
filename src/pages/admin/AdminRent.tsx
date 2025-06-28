@@ -500,4 +500,4 @@ const AdminRent: React.FC = () => {
   );
 };
 
-export default AdminRent;
+export default AdminRent; 
