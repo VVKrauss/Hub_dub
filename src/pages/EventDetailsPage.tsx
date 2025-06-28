@@ -1,4 +1,4 @@
-// src/pages/EventDetailsPage.tsx - Обновленная верс// src/pages/EventDetailsPage.tsx - Обновленная версия с новым API
+// src/pages/EventDetailsPage.tsx - Упрощенная версия без модальных окон
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { createClient } from '@supabase/supabase-js';
@@ -12,7 +12,6 @@ import {
   formatTimeFromTimestamp, 
   isPastEvent 
 } from '../utils/dateTimeUtils';
-import MigrationUtility from '../utils/migrationUtility';
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
