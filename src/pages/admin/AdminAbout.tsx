@@ -240,7 +240,7 @@ const AdminAbout: React.FC = () => {
     }));
   };
 
-  const editTeamMember = (index: number) => {
+  const handleEditTeamMember = (index: number) => {
     setEditTeamMember(aboutData.team_members[index]);
     setEditingTeamIndex(index);
     setShowTeamForm(true);
@@ -275,7 +275,7 @@ const AdminAbout: React.FC = () => {
     }));
   };
 
-  const editContributor = (index: number) => {
+  const handleEditContributor = (index: number) => {
     setEditContributor(aboutData.contributors[index]);
     setEditingContributorIndex(index);
     setShowContributorForm(true);
@@ -310,7 +310,7 @@ const AdminAbout: React.FC = () => {
     }));
   };
 
-  const editPlatform = (index: number) => {
+  const handleEditPlatform = (index: number) => {
     setEditPlatform(aboutData.support_platforms[index]);
     setEditingPlatformIndex(index);
     setShowPlatformForm(true);
@@ -327,7 +327,7 @@ const AdminAbout: React.FC = () => {
       </div>
     );
   }
-
+  
   // src/pages/admin/AdminAbout.tsx - Часть 3: Главный интерфейс
 
   // === РЕНДЕР ===
