@@ -777,7 +777,7 @@ const AdminAbout: React.FC = () => {
                         <img
                           src={platform.logo}
                           alt={platform.platform}
-                          className="w-8 h-8 object-cover mb-2"
+                          className="w-8 h-8 object-cover mb-2"   
                         />
                       )}
                       <h4 className="font-medium text-gray-900 dark:text-white text-sm">{platform.platform}</h4>
