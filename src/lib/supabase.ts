@@ -32,4 +32,4 @@ if (!supabaseAnonKey) {
 }
 
 console.log('✅ Supabase initialized successfully');
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey); 
