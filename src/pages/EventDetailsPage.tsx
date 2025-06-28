@@ -1072,7 +1072,7 @@ const EventDetailsPage = () => {
                         to="/events"
                         className="inline-block mt-4 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm"
                       >
-                        Смотреть другие мероприятия
+                        Смотреть другие мероприятия.  
                       </Link>
                     </div>
                   </div>
