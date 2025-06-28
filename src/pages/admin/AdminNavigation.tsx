@@ -1,37 +1,33 @@
-import { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
-import { toast } from 'react-hot-toast';
+import React, { useState, useEffect } from 'react';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import { 
-  Save, 
+  Layout, 
+  Settings, 
   Plus, 
-  GripVertical, 
+  Save, 
   Eye, 
   EyeOff, 
   Trash2, 
-  RotateCcw,
-  Layout,
-  Settings,
+  GripVertical,
+  Loader2,
   Palette,
-  Monitor
+  Monitor,
+  RotateCcw
 } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 import { Button } from '../../shared/ui/Button/Button';
-
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-);
+import { toast } from 'react-hot-toast';
 
 // Типы для навигации
-type NavItem = {
+interface NavigationItem {
   id: string;
   label: string;
   path: string;
   visible: boolean;
   order: number;
-};
+}
 
-type TopBarSettings = {
+interface TopBarSettings {
   alignment: 'left' | 'center' | 'right' | 'space-between';
   style: 'classic' | 'modern' | 'minimal' | 'rounded';
   spacing: 'compact' | 'normal' | 'relaxed';
@@ -45,11 +41,11 @@ type TopBarSettings = {
   showBadges: boolean;
   stickyHeader: boolean;
   maxWidth: 'container' | 'full' | 'screen-xl';
-};
+}
 
-const AdminNavigation = () => {
+const AdminNavigation: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'navigation' | 'topbar'>('navigation');
-  const [navItems, setNavItems] = useState<NavItem[]>([]);
+  const [navItems, setNavItems] = useState<NavigationItem[]>([]);
   const [topBarSettings, setTopBarSettings] = useState<TopBarSettings>({
     alignment: 'space-between',
     style: 'modern',
@@ -70,6 +66,7 @@ const AdminNavigation = () => {
   const [saving, setSaving] = useState(false);
   const [newItemLabel, setNewItemLabel] = useState('');
   const [newItemPath, setNewItemPath] = useState('');
+  const [siteSettingsId, setSiteSettingsId] = useState<string | null>(null);
 
   // Загрузка данных навигации
   useEffect(() => {
@@ -80,26 +77,41 @@ const AdminNavigation = () => {
     try {
       setLoading(true);
       
-      // Загружаем навигационные элементы
-      const { data: navData, error: navError } = await supabase
-        .from('navigation_items')
-        .select('*')
-        .order('order');
-
-      if (navError) throw navError;
-
-      // Загружаем настройки топбара
+      // Загружаем настройки сайта
       const { data: settingsData, error: settingsError } = await supabase
         .from('site_settings')
-        .select('topbar_settings')
+        .select('*')
         .limit(1)
         .single();
 
-      if (settingsError && settingsError.code !== 'PGRST116') throw settingsError;
+      if (settingsError && settingsError.code !== 'PGRST116') {
+        throw settingsError;
+      }
 
-      setNavItems(navData || []);
-      if (settingsData?.topbar_settings) {
-        setTopBarSettings(settingsData.topbar_settings);
+      if (settingsData) {
+        setSiteSettingsId(settingsData.id);
+        
+        // Загружаем навигационные элементы из JSONB поля
+        const navigationItems = settingsData.navigation_items || [];
+        setNavItems(navigationItems);
+        
+        // Загружаем настройки топбара
+        if (settingsData.topbar_settings) {
+          setTopBarSettings({ ...topBarSettings, ...settingsData.topbar_settings });
+        }
+      } else {
+        // Создаем новую запись настроек, если её нет
+        const { data: newSettings, error: createError } = await supabase
+          .from('site_settings')
+          .insert({
+            navigation_items: [],
+            topbar_settings: topBarSettings
+          })
+          .select()
+          .single();
+
+        if (createError) throw createError;
+        setSiteSettingsId(newSettings.id);
       }
     } catch (error) {
       console.error('Error loading navigation data:', error);
@@ -125,90 +137,59 @@ const AdminNavigation = () => {
     setNavItems(updatedItems);
   };
 
-  const handleAddNavItem = async () => {
+  const handleAddNavItem = () => {
     if (!newItemLabel.trim() || !newItemPath.trim()) {
       toast.error('Заполните все поля');
       return;
     }
 
-    try {
-      const newOrder = Math.max(...navItems.map(item => item.order), 0) + 1;
-      
-      const { data, error } = await supabase
-        .from('navigation_items')
-        .insert({
-          label: newItemLabel.trim(),
-          path: newItemPath.trim(),
-          visible: true,
-          order: newOrder
-        })
-        .select()
-        .single();
+    const newOrder = Math.max(...navItems.map(item => item.order), -1) + 1;
+    const newItem: NavigationItem = {
+      id: crypto.randomUUID(),
+      label: newItemLabel.trim(),
+      path: newItemPath.trim(),
+      visible: true,
+      order: newOrder
+    };
 
-      if (error) throw error;
-
-      setNavItems(prev => [...prev, data]);
-      setNewItemLabel('');
-      setNewItemPath('');
-      toast.success('Элемент навигации добавлен');
-    } catch (error) {
-      console.error('Error adding nav item:', error);
-      toast.error('Ошибка при добавлении элемента');
-    }
+    setNavItems(prev => [...prev, newItem]);
+    setNewItemLabel('');
+    setNewItemPath('');
+    toast.success('Элемент навигации добавлен');
   };
 
-  const handleToggleVisibility = async (id: string, visible: boolean) => {
-    try {
-      const { error } = await supabase
-        .from('navigation_items')
-        .update({ visible: !visible })
-        .eq('id', id);
-
-      if (error) throw error;
-
-      setNavItems(prev => 
-        prev.map(item => 
-          item.id === id ? { ...item, visible: !visible } : item
-        )
-      );
-      
-      toast.success(visible ? 'Элемент скрыт' : 'Элемент показан');
-    } catch (error) {
-      console.error('Error toggling visibility:', error);
-      toast.error('Ошибка при изменении видимости');
-    }
+  const handleToggleVisibility = (id: string) => {
+    setNavItems(prev => 
+      prev.map(item => 
+        item.id === id ? { ...item, visible: !item.visible } : item
+      )
+    );
   };
 
-  const handleDeleteNavItem = async (id: string) => {
-    try {
-      const { error } = await supabase
-        .from('navigation_items')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-
-      setNavItems(prev => prev.filter(item => item.id !== id));
-      toast.success('Элемент удален');
-    } catch (error) {
-      console.error('Error deleting nav item:', error);
-      toast.error('Ошибка при удалении элемента');
-    }
+  const handleDeleteNavItem = (id: string) => {
+    setNavItems(prev => prev.filter(item => item.id !== id));
+    toast.success('Элемент удален');
   };
 
   const saveNavigation = async () => {
+    if (!siteSettingsId) {
+      toast.error('Ошибка: не найдены настройки сайта');
+      return;
+    }
+
     try {
       setSaving(true);
       
-      // Сохраняем порядок навигационных элементов
-      const updates = navItems.map(item => supabase
-        .from('navigation_items')
-        .update({ order: item.order })
-        .eq('id', item.id)
-      );
+      const { error } = await supabase
+        .from('site_settings')
+        .update({ 
+          navigation_items: navItems.sort((a, b) => a.order - b.order)
+        })
+        .eq('id', siteSettingsId);
 
-      await Promise.all(updates);
-      toast.success('Порядок навигации сохранен');
+      if (error) throw error;
+      
+      toast.success('Навигация сохранена');
     } catch (error) {
       console.error('Error saving navigation:', error);
       toast.error('Ошибка при сохранении навигации');
@@ -218,33 +199,21 @@ const AdminNavigation = () => {
   };
 
   const saveTopBarSettings = async () => {
+    if (!siteSettingsId) {
+      toast.error('Ошибка: не найдены настройки сайта');
+      return;
+    }
+
     try {
       setSaving(true);
       
-      // Находим или создаем запись настроек
-      const { data: existing } = await supabase
+      const { error } = await supabase
         .from('site_settings')
-        .select('id')
-        .limit(1)
-        .single();
+        .update({ topbar_settings: topBarSettings })
+        .eq('id', siteSettingsId);
 
-      if (existing) {
-        // Обновляем существующую запись
-        const { error } = await supabase
-          .from('site_settings')
-          .update({ topbar_settings: topBarSettings })
-          .eq('id', existing.id);
-
-        if (error) throw error;
-      } else {
-        // Создаем новую запись
-        const { error } = await supabase
-          .from('site_settings')
-          .insert({ topbar_settings: topBarSettings });
-
-        if (error) throw error;
-      }
-
+      if (error) throw error;
+      
       toast.success('Настройки топбара сохранены');
     } catch (error) {
       console.error('Error saving topbar settings:', error);
@@ -254,7 +223,7 @@ const AdminNavigation = () => {
     }
   };
 
-  const resetTopBarToDefaults = () => {
+  const resetTopBarSettings = () => {
     setTopBarSettings({
       alignment: 'space-between',
       style: 'modern',
@@ -275,26 +244,22 @@ const AdminNavigation = () => {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center py-12">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-300">Загрузка...</p>
-        </div>
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Управление навигацией</h1>
-        <p className="text-gray-600 dark:text-gray-300 mt-2">
-          Настройте элементы навигации и внешний вид топбара
-        </p>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+          Управление навигацией
+        </h1>
       </div>
 
-      {/* Вкладки */}
-      <div className="flex mb-8 border-b border-gray-200 dark:border-gray-700">
+      {/* Tabs */}
+      <div className="border-b border-gray-200 dark:border-gray-600">
         <button
           onClick={() => setActiveTab('navigation')}
           className={`px-6 py-3 font-medium transition-colors ${
@@ -377,84 +342,95 @@ const AdminNavigation = () => {
                   loading={saving}
                   leftIcon={<Save className="h-4 w-4" />}
                 >
-                  {saving ? 'Сохранение...' : 'Сохранить порядок'}
+                  {saving ? 'Сохранение...' : 'Сохранить'}
                 </Button>
               </div>
 
-              {navItems.length > 0 && (
-                <DragDropContext onDragEnd={handleDragEnd}>
-                  <Droppable droppableId="navigation">
-                    {(provided) => (
-                      <div {...provided.droppableProps} ref={provided.innerRef}>
-                        {navItems.map((item, index) => (
-                          <Draggable key={item.id} draggableId={item.id} index={index}>
-                            {(provided) => (
+              <DragDropContext onDragEnd={handleDragEnd}>
+                <Droppable droppableId="navigation-items">
+                  {(provided) => (
+                    <div
+                      {...provided.droppableProps}
+                      ref={provided.innerRef}
+                      className="space-y-2"
+                    >
+                      {navItems.map((item, index) => (
+                        <Draggable key={item.id} draggableId={item.id} index={index}>
+                          {(provided) => (
+                            <div
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-dark-700 rounded-lg"
+                            >
                               <div
-                                ref={provided.innerRef}
-                                {...provided.draggableProps}
-                                className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg mb-2 border border-gray-200 dark:border-gray-600"
+                                {...provided.dragHandleProps}
+                                className="cursor-grab active:cursor-grabbing"
                               >
-                                <div className="flex items-center gap-4">
-                                  <div {...provided.dragHandleProps}>
-                                    <GripVertical className="h-5 w-5 text-gray-400 cursor-grab" />
-                                  </div>
-                                  <div>
-                                    <div className="font-medium text-gray-900 dark:text-white">
-                                      {item.label}
-                                    </div>
-                                    <div className="text-sm text-gray-500 dark:text-gray-400">
-                                      {item.path}
-                                    </div>
-                                  </div>
+                                <GripVertical className="h-5 w-5 text-gray-400" />
+                              </div>
+                              
+                              <div className="flex-1">
+                                <div className="font-medium text-gray-900 dark:text-white">
+                                  {item.label}
                                 </div>
-
-                                <div className="flex items-center gap-2">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleToggleVisibility(item.id, item.visible)}
-                                    leftIcon={item.visible ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                                  >
-                                  </Button>
-
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleDeleteNavItem(item.id)}
-                                    leftIcon={<Trash2 className="h-4 w-4" />}
-                                  >
-                                  </Button>
+                                <div className="text-sm text-gray-500 dark:text-gray-400">
+                                  {item.path}
                                 </div>
                               </div>
-                            )}
-                          </Draggable>
-                        ))}
-                        {provided.placeholder}
-                      </div>
-                    )}
-                  </Droppable>
-                </DragDropContext>
+
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => handleToggleVisibility(item.id)}
+                                  className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                                  title={item.visible ? 'Скрыть' : 'Показать'}
+                                >
+                                  {item.visible ? (
+                                    <Eye className="h-4 w-4" />
+                                  ) : (
+                                    <EyeOff className="h-4 w-4" />
+                                  )}
+                                </button>
+                                
+                                <button
+                                  onClick={() => handleDeleteNavItem(item.id)}
+                                  className="p-2 text-red-500 hover:text-red-700"
+                                  title="Удалить"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </Draggable>
+                      ))}
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
+              </DragDropContext>
+
+              {navItems.length === 0 && (
+                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                  Элементы навигации не найдены
+                </div>
               )}
             </div>
           </div>
         </div>
       )}
 
-      {/* TopBar Settings Tab */}
+      {/* TopBar Tab */}
       {activeTab === 'topbar' && (
-        <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-600">
-          <div className="p-6">
+        <div className="space-y-6">
+          <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-600 p-6">
             <div className="flex justify-between items-center mb-6">
-              <div>
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Настройки топбара</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-                  Настройте внешний вид и поведение верхней панели
-                </p>
-              </div>
-              <div className="flex gap-3">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                Настройки топбара
+              </h3>
+              <div className="flex gap-2">
                 <Button
-                  variant="outline"
-                  onClick={resetTopBarToDefaults}
+                  variant="secondary"
+                  onClick={resetTopBarSettings}
                   leftIcon={<RotateCcw className="h-4 w-4" />}
                 >
                   Сбросить
@@ -471,63 +447,65 @@ const AdminNavigation = () => {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Layout Settings */}
+              {/* Левая колонка - Основные настройки */}
               <div className="space-y-6">
-                <h4 className="font-semibold flex items-center gap-2 text-gray-900 dark:text-white">
-                  <Layout className="h-5 w-5 text-primary-600" />
-                  Расположение и стиль
-                </h4>
+                <div className="flex items-center gap-2 mb-4">
+                  <Monitor className="h-5 w-5 text-primary-600" />
+                  <h4 className="text-lg font-medium text-gray-900 dark:text-white">
+                    Основные настройки
+                  </h4>
+                </div>
 
-                {/* Alignment */}
+                {/* Выравнивание */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Выравнивание
+                    Выравнивание контента
                   </label>
                   <select
                     value={topBarSettings.alignment}
                     onChange={(e) => setTopBarSettings(prev => ({ 
                       ...prev, 
-                      alignment: e.target.value as TopBarSettings['alignment'] 
+                      alignment: e.target.value as TopBarSettings['alignment']
                     }))}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   >
-                    <option value="left">Слева</option>
+                    <option value="left">По левому краю</option>
                     <option value="center">По центру</option>
-                    <option value="right">Справа</option>
-                    <option value="space-between">Разнести по краям</option>
+                    <option value="right">По правому краю</option>
+                    <option value="space-between">Равномерное распределение</option>
                   </select>
                 </div>
 
-                {/* Style */}
+                {/* Стиль */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Стиль
+                    Стиль топбара
                   </label>
                   <select
                     value={topBarSettings.style}
                     onChange={(e) => setTopBarSettings(prev => ({ 
                       ...prev, 
-                      style: e.target.value as TopBarSettings['style'] 
+                      style: e.target.value as TopBarSettings['style']
                     }))}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   >
                     <option value="classic">Классический</option>
                     <option value="modern">Современный</option>
                     <option value="minimal">Минимальный</option>
-                    <option value="rounded">Закругленный</option>
+                    <option value="rounded">Скругленный</option>
                   </select>
                 </div>
 
-                {/* Height */}
+                {/* Размер */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Высота
+                    Высота топбара
                   </label>
                   <select
                     value={topBarSettings.height}
                     onChange={(e) => setTopBarSettings(prev => ({ 
                       ...prev, 
-                      height: e.target.value as TopBarSettings['height'] 
+                      height: e.target.value as TopBarSettings['height']
                     }))}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   >
@@ -536,25 +514,65 @@ const AdminNavigation = () => {
                     <option value="large">Большая</option>
                   </select>
                 </div>
-              </div>
 
-              {/* Visual Settings */}
-              <div className="space-y-6">
-                <h4 className="font-semibold flex items-center gap-2 text-gray-900 dark:text-white">
-                  <Palette className="h-5 w-5 text-primary-600" />
-                  Внешний вид
-                </h4>
-
-                {/* Background */}
+                {/* Отступы */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Фон
+                    Внутренние отступы
+                  </label>
+                  <select
+                    value={topBarSettings.spacing}
+                    onChange={(e) => setTopBarSettings(prev => ({ 
+                      ...prev, 
+                      spacing: e.target.value as TopBarSettings['spacing']
+                    }))}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  >
+                    <option value="compact">Компактные</option>
+                    <option value="normal">Обычные</option>
+                    <option value="relaxed">Увеличенные</option>
+                  </select>
+                </div>
+
+                {/* Максимальная ширина */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Максимальная ширина
+                  </label>
+                  <select
+                    value={topBarSettings.maxWidth}
+                    onChange={(e) => setTopBarSettings(prev => ({ 
+                      ...prev, 
+                      maxWidth: e.target.value as TopBarSettings['maxWidth']
+                    }))}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  >
+                    <option value="container">Контейнер</option>
+                    <option value="full">Полная ширина</option>
+                    <option value="screen-xl">Широкий экран</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Правая колонка - Внешний вид */}
+              <div className="space-y-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Palette className="h-5 w-5 text-primary-600" />
+                  <h4 className="text-lg font-medium text-gray-900 dark:text-white">
+                    Внешний вид
+                  </h4>
+                </div>
+
+                {/* Цвет фона */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Фон топбара
                   </label>
                   <select
                     value={topBarSettings.backgroundColor}
                     onChange={(e) => setTopBarSettings(prev => ({ 
                       ...prev, 
-                      backgroundColor: e.target.value as TopBarSettings['backgroundColor'] 
+                      backgroundColor: e.target.value as TopBarSettings['backgroundColor']
                     }))}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   >
@@ -564,92 +582,89 @@ const AdminNavigation = () => {
                   </select>
                 </div>
 
-                {/* Checkboxes */}
-                <div className="space-y-3">
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={topBarSettings.showBorder}
-                      onChange={(e) => setTopBarSettings(prev => ({ 
-                        ...prev, 
-                        showBorder: e.target.checked 
-                      }))}
-                      className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                    />
-                    <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Показать границу</span>
-                  </label>
-
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={topBarSettings.showShadow}
-                      onChange={(e) => setTopBarSettings(prev => ({ 
-                        ...prev, 
-                        showShadow: e.target.checked 
-                      }))}
-                      className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                    />
-                    <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Показать тень</span>
-                  </label>
-
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={topBarSettings.stickyHeader}
-                      onChange={(e) => setTopBarSettings(prev => ({ 
-                        ...prev, 
-                        stickyHeader: e.target.checked 
-                      }))}
-                      className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                    />
-                    <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Закрепить вверху</span>
-                  </label>
-
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={topBarSettings.showIcons}
-                      onChange={(e) => setTopBarSettings(prev => ({ 
-                        ...prev, 
-                        showIcons: e.target.checked 
-                      }))}
-                      className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                    />
-                    <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Показать иконки</span>
-                  </label>
-
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={topBarSettings.mobileCollapse}
-                      onChange={(e) => setTopBarSettings(prev => ({ 
-                        ...prev, 
-                        mobileCollapse: e.target.checked 
-                      }))}
-                      className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                    />
-                    <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Сворачивать на мобильных</span>
-                  </label>
-                </div>
-
-                {/* Max Width */}
+                {/* Анимация */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Максимальная ширина
+                    Анимация появления
                   </label>
                   <select
-                    value={topBarSettings.maxWidth}
+                    value={topBarSettings.animation}
                     onChange={(e) => setTopBarSettings(prev => ({ 
                       ...prev, 
-                      maxWidth: e.target.value as TopBarSettings['maxWidth'] 
+                      animation: e.target.value as TopBarSettings['animation']
                     }))}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   >
-                    <option value="container">Контейнер</option>
-                    <option value="full">Полная ширина</option>
-                    <option value="screen-xl">Очень широкий</option>
+                    <option value="none">Без анимации</option>
+                    <option value="fade">Затухание</option>
+                    <option value="slide">Скольжение</option>
+                    <option value="bounce">Отскок</option>
                   </select>
                 </div>
+
+                {/* Переключатели */}
+                <div className="space-y-4">
+                  {[
+                    { key: 'showBorder', label: 'Показать границу' },
+                    { key: 'showShadow', label: 'Показать тень' },
+                    { key: 'stickyHeader', label: 'Закрепленный заголовок' },
+                    { key: 'mobileCollapse', label: 'Сворачивать на мобильных' },
+                    { key: 'showIcons', label: 'Показать иконки' },
+                    { key: 'showBadges', label: 'Показать бейджи' },
+                  ].map(({ key, label }) => (
+                    <div key={key} className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        {label}
+                      </span>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={topBarSettings[key as keyof TopBarSettings] as boolean}
+                          onChange={(e) => setTopBarSettings(prev => ({ 
+                            ...prev, 
+                            [key]: e.target.checked 
+                          }))}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary-600"></div>
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Предварительный просмотр */}
+            <div className="mt-8 p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
+              <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                Предварительный просмотр:
+              </h5>
+              <div 
+                className={`
+                  w-full p-4 rounded-lg transition-all
+                  ${topBarSettings.backgroundColor === 'white' ? 'bg-white' : 
+                    topBarSettings.backgroundColor === 'transparent' ? 'bg-transparent border border-gray-200' : 
+                    'bg-gray-100/50 backdrop-blur-sm'}
+                  ${topBarSettings.showBorder ? 'border-b border-gray-200' : ''}
+                  ${topBarSettings.showShadow ? 'shadow-sm' : ''}
+                  ${topBarSettings.height === 'compact' ? 'py-2' : 
+                    topBarSettings.height === 'large' ? 'py-6' : 'py-4'}
+                  ${topBarSettings.spacing === 'compact' ? 'px-2' : 
+                    topBarSettings.spacing === 'relaxed' ? 'px-8' : 'px-4'}
+                  flex items-center
+                  ${topBarSettings.alignment === 'center' ? 'justify-center' :
+                    topBarSettings.alignment === 'right' ? 'justify-end' :
+                    topBarSettings.alignment === 'space-between' ? 'justify-between' : 'justify-start'}
+                `}
+              >
+                <div className="text-sm text-gray-600 font-medium">Логотип</div>
+                {topBarSettings.alignment === 'space-between' && (
+                  <div className="flex gap-4 text-sm text-gray-600">
+                    <span>Главная</span>
+                    <span>О нас</span>
+                    <span>Контакты</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>

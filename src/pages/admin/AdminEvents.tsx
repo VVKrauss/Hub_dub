@@ -598,8 +598,6 @@ const AdminEvents = () => {
                         </h3>
                       </div>
 
-                      // src/pages/admin/AdminEvents.tsx - Часть 3 (карточки событий и модальные окна)
-
                       {/* Детали мероприятия */}
                       <div className="space-y-3 mb-4">
                         <div className="flex items-center text-gray-600 dark:text-gray-300 text-sm">
