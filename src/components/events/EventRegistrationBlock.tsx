@@ -3,9 +3,9 @@ import { useState, useEffect } from 'react';
 import { Mail, Phone, User, CreditCard, MapPin, AlertCircle, CheckCircle, ExternalLink } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { formatRussianDate, formatTimeFromTimestamp } from '../../utils/dateTimeUtils';
-import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../../shared/ui/Button/Button';
+import SimpleRegistrationService from '../../services/SimpleRegistrationService';
 
 declare global {
   interface Window {
@@ -23,14 +23,13 @@ type EventRegistrationBlockProps = {
     location: string;
     price: number;
     currency: string;
-    payment_type: string; // 'free' | 'donation' | 'paid'
-    payment_link?: string;
-    oblakkarte_data_event_id?: string;
-    registrations?: {
-      max_regs: number;
-      current: number;
-      reg_list: any[];
-    };
+    simple_payment_type: 'free' | 'donation' | 'paid';
+    online_payment_url?: string;
+    online_payment_type?: 'link' | 'oblakkarte';
+    max_registrations: number;
+    current_registrations: number;
+    registration_enabled: boolean;
+    registration_deadline?: string;
   };
   onRegistrationSuccess?: () => void;
 };
@@ -42,6 +41,7 @@ const EventRegistrationBlock = ({ event, onRegistrationSuccess }: EventRegistrat
   const [selectedMethod, setSelectedMethod] = useState<RegistrationMethod>('none');
   const [loading, setLoading] = useState(false);
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
+  const [registrationDetails, setRegistrationDetails] = useState<any>(null);
   
   const [formData, setFormData] = useState({
     fullName: '',
@@ -52,14 +52,15 @@ const EventRegistrationBlock = ({ event, onRegistrationSuccess }: EventRegistrat
 
   // Загружаем скрипт Oblakkarte виджета если нужно
   useEffect(() => {
-    if (event.oblakkarte_data_event_id && !document.querySelector('script[src="https://widget.oblakkarte.rs/widget.js"]')) {
+    if (event.online_payment_type === 'oblakkarte' && event.online_payment_url && 
+        !document.querySelector('script[src="https://widget.oblakkarte.rs/widget.js"]')) {
       const script = document.createElement('script');
       script.src = 'https://widget.oblakkarte.rs/widget.js';
       script.async = true;
       script.setAttribute('data-organizer-public-token', 'Yi0idjZg');
       document.head.appendChild(script);
     }
-  }, [event.oblakkarte_data_event_id]);
+  }, [event.online_payment_type, event.online_payment_url]);
 
   // Заполняем форму данными пользователя
   useEffect(() => {
@@ -72,18 +73,20 @@ const EventRegistrationBlock = ({ event, onRegistrationSuccess }: EventRegistrat
     }
   }, [user]);
 
-  const isFree = event.payment_type === 'free';
-  const isDonation = event.payment_type === 'donation';
-  const isPaid = event.payment_type === 'paid';
+  const isFree = event.simple_payment_type === 'free';
+  const isDonation = event.simple_payment_type === 'donation';
+  const isPaid = event.simple_payment_type === 'paid';
   
-  const hasOnlinePayment = event.payment_link || event.oblakkarte_data_event_id;
-  const canRegisterOnSite = isFree || isDonation || isPaid;
+  const hasOnlinePayment = event.online_payment_url;
+  const canRegisterOnSite = event.registration_enabled;
 
   // Проверяем доступность мест
-  const maxRegistrations = event.registrations?.max_regs || 50;
-  const currentRegistrations = event.registrations?.current || 0;
-  const spotsLeft = maxRegistrations - currentRegistrations;
+  const spotsLeft = event.max_registrations - event.current_registrations;
   const isFull = spotsLeft <= 0;
+
+  // Проверяем дедлайн регистрации
+  const isDeadlinePassed = event.registration_deadline ? 
+    new Date() > new Date(event.registration_deadline) : false;
 
   const handleSiteRegistration = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,72 +99,33 @@ const EventRegistrationBlock = ({ event, onRegistrationSuccess }: EventRegistrat
     setLoading(true);
 
     try {
-      const registrationId = crypto.randomUUID();
-      const qrCode = `${event.id}-${registrationId}`;
-      
-      // Получаем текущие регистрации
-      const { data: eventData, error: fetchError } = await supabase
-        .from('events')
-        .select('registrations')
-        .eq('id', event.id)
-        .single();
+      // Проверяем, можно ли зарегистрироваться
+      const canRegister = await SimpleRegistrationService.canUserRegister(
+        event.id, 
+        formData.email, 
+        formData.tickets
+      );
 
-      if (fetchError) throw fetchError;
-
-      const currentRegistrations = eventData.registrations || {
-        max_regs: maxRegistrations,
-        current: 0,
-        reg_list: []
-      };
-
-      // Создаем новую регистрацию
-      const newRegistration = {
-        id: registrationId,
-        full_name: formData.fullName,
-        email: formData.email.toLowerCase(),
-        phone: formData.phone,
-        tickets: formData.tickets,
-        total_amount: isPaid ? (event.price * formData.tickets) : 0,
-        payment_status: isFree ? 'free' : isDonation ? 'donation' : 'venue',
-        status: true,
-        qr_code: qrCode,
-        created_at: new Date().toISOString()
-      };
-
-      // Обновляем регистрации
-      const updatedRegistrations = {
-        ...currentRegistrations,
-        current: currentRegistrations.current + formData.tickets,
-        reg_list: [...currentRegistrations.reg_list, newRegistration]
-      };
-
-      // Сохраняем в базу
-      const { error: updateError } = await supabase
-        .from('events')
-        .update({ registrations: updatedRegistrations })
-        .eq('id', event.id);
-
-      if (updateError) throw updateError;
-
-      // Синхронизируем с пользователем если авторизован
-      if (user) {
-        await supabase
-          .from('user_event_registrations')
-          .upsert({
-            user_id: user.id,
-            event_id: event.id,
-            registration_id: registrationId,
-            full_name: formData.fullName,
-            email: formData.email,
-            phone: formData.phone,
-            tickets: formData.tickets,
-            total_amount: newRegistration.total_amount,
-            payment_status: newRegistration.payment_status,
-            status: 'active',
-            qr_code: qrCode
-          });
+      if (!canRegister.canRegister) {
+        toast.error(canRegister.reason || 'Невозможно зарегистрироваться');
+        return;
       }
 
+      // Создаем регистрацию
+      const result = await SimpleRegistrationService.createRegistration({
+        eventId: event.id,
+        fullName: formData.fullName,
+        email: formData.email,
+        phone: formData.phone,
+        tickets: formData.tickets
+      });
+
+      if (!result.success) {
+        toast.error(result.error || 'Ошибка при регистрации');
+        return;
+      }
+
+      setRegistrationDetails(result.registration);
       setRegistrationSuccess(true);
       toast.success('Регистрация прошла успешно!');
       
@@ -178,19 +142,19 @@ const EventRegistrationBlock = ({ event, onRegistrationSuccess }: EventRegistrat
   };
 
   const handleOnlinePayment = () => {
-    if (event.oblakkarte_data_event_id && window.OblakWidget) {
+    if (event.online_payment_type === 'oblakkarte' && event.online_payment_url && window.OblakWidget) {
       window.OblakWidget.open({
-        eventId: event.oblakkarte_data_event_id,
+        eventId: event.online_payment_url,
         lang: 'ru'
       });
-    } else if (event.payment_link) {
-      window.open(event.payment_link, '_blank');
+    } else if (event.online_payment_type === 'link' && event.online_payment_url) {
+      window.open(event.online_payment_url, '_blank');
     } else {
       toast.error('Онлайн оплата недоступна');
     }
   };
 
-  if (registrationSuccess) {
+  if (registrationSuccess && registrationDetails) {
     return (
       <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-6">
         <div className="flex items-center gap-3 mb-4">
@@ -200,15 +164,17 @@ const EventRegistrationBlock = ({ event, onRegistrationSuccess }: EventRegistrat
           </h3>
         </div>
         <div className="text-green-700 dark:text-green-300 space-y-2">
-          <p><strong>Имя:</strong> {formData.fullName}</p>
-          <p><strong>Email:</strong> {formData.email}</p>
-          {formData.phone && <p><strong>Телефон:</strong> {formData.phone}</p>}
-          <p><strong>Билетов:</strong> {formData.tickets}</p>
+          <p><strong>Имя:</strong> {registrationDetails.full_name}</p>
+          <p><strong>Email:</strong> {registrationDetails.email}</p>
+          {registrationDetails.phone && <p><strong>Телефон:</strong> {registrationDetails.phone}</p>}
+          <p><strong>Билетов:</strong> {registrationDetails.tickets}</p>
+          <p><strong>QR-код:</strong> <code className="bg-green-100 dark:bg-green-800 px-2 py-1 rounded text-xs">{registrationDetails.qr_code}</code></p>
           {isPaid && (
-            <p className="text-sm mt-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded border border-yellow-200 dark:border-yellow-800">
+            <div className="mt-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded border border-yellow-200 dark:border-yellow-800">
               <AlertCircle className="h-4 w-4 inline mr-2" />
-              Оплата производится на месте проведения мероприятия
-            </p>
+              <strong>К оплате на месте: {registrationDetails.total_amount} {event.currency}</strong>
+              <p className="text-sm mt-1">Оплата производится при посещении мероприятия</p>
+            </div>
           )}
         </div>
       </div>
@@ -225,6 +191,38 @@ const EventRegistrationBlock = ({ event, onRegistrationSuccess }: EventRegistrat
           </h3>
           <p className="text-gray-600 dark:text-gray-300">
             К сожалению, все места на это мероприятие заняты
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isDeadlinePassed) {
+    return (
+      <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg p-6">
+        <div className="text-center">
+          <AlertCircle className="h-8 w-8 text-gray-400 mx-auto mb-3" />
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+            Регистрация закрыта
+          </h3>
+          <p className="text-gray-600 dark:text-gray-300">
+            Срок регистрации на это мероприятие истек
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!event.registration_enabled) {
+    return (
+      <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg p-6">
+        <div className="text-center">
+          <AlertCircle className="h-8 w-8 text-gray-400 mx-auto mb-3" />
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+            Регистрация отключена
+          </h3>
+          <p className="text-gray-600 dark:text-gray-300">
+            Регистрация на это мероприятие временно недоступна
           </p>
         </div>
       </div>
@@ -249,7 +247,7 @@ const EventRegistrationBlock = ({ event, onRegistrationSuccess }: EventRegistrat
             `${event.price} ${event.currency}`
           }</p>
           {spotsLeft > 0 && (
-            <p><strong>Свободных мест:</strong> {spotsLeft} из {maxRegistrations}</p>
+            <p><strong>Свободных мест:</strong> {spotsLeft} из {event.max_registrations}</p>
           )}
         </div>
 
@@ -359,7 +357,7 @@ const EventRegistrationBlock = ({ event, onRegistrationSuccess }: EventRegistrat
                         onChange={(e) => setFormData(prev => ({ ...prev, tickets: parseInt(e.target.value) }))}
                         className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                       >
-                        {[1,2,3,4,5].map(num => (
+                        {Array.from({ length: Math.min(5, spotsLeft) }, (_, i) => i + 1).map(num => (
                           <option key={num} value={num}>{num}</option>
                         ))}
                       </select>
