@@ -16,7 +16,7 @@ interface TimeSlot {
     title?: string;
     description?: string;
     user_name?: string;
-    type: 'event' | 'rent';
+    type: 'event' | 'rent' | 'booking';
     status?: string;
   };
 }
@@ -27,7 +27,7 @@ interface GroupedSlot {
   start_at: string;
   end_at: string;
   title: string;
-  type: 'event' | 'rent';
+  type: 'event' | 'rent' | 'booking';
   status?: string;
 }
 
@@ -77,6 +77,7 @@ const AdminCalendarPage: React.FC = () => {
     switch (type) {
       case 'event': return 'bg-green-50 dark:bg-green-900/30 border-l-4 border-green-500';
       case 'rent': return 'bg-blue-50 dark:bg-blue-900/30 border-l-4 border-blue-500';
+      case 'booking': return 'bg-purple-50 dark:bg-purple-900/30 border-l-4 border-purple-500';
       default: return 'bg-gray-50 dark:bg-gray-700 border-l-4 border-gray-300';
     }
   };
@@ -198,7 +199,6 @@ const AdminCalendarPage: React.FC = () => {
     style?: React.CSSProperties;
     className?: string;
   }) => {
-    const { formatSlotTime, isSlotPast } = { formatSlotTime, isSlotPast };
     const isPastSlot = isSlotPast(slot.end_at);
     
     const firstSlot = groupedSlot?.slots[0] || slot;
@@ -207,31 +207,31 @@ const AdminCalendarPage: React.FC = () => {
     return (
       <div
         className={`p-2 rounded-lg cursor-pointer hover:shadow-md transition-all duration-200 ${getSlotColorClasses(
-          slot.slot_details.type, 
-          slot.slot_details.status, 
+          slot.slot_details?.type || 'event', 
+          slot.slot_details?.status, 
           isPastSlot
         )} ${className}`}
         style={style}
         onClick={(e) => {
           e.stopPropagation();
-          if (slot.slot_details.type === 'rent') {
+          if (slot.slot_details?.type === 'rent' || slot.slot_details?.type === 'booking') {
             onEdit(slot);
           }
         }}
       >
         <div className="font-medium truncate text-sm">
-          {formatSlotTime(firstSlot.start_at)} {slot.slot_details.title && `- ${slot.slot_details.title}`}
-          {slot.slot_details.status === 'draft' && <span className="text-xs text-gray-500 ml-1">(черновик)</span>}
+          {formatSlotTime(firstSlot.start_at)} {slot.slot_details?.title && `- ${slot.slot_details.title}`}
+          {slot.slot_details?.status === 'draft' && <span className="text-xs text-gray-500 ml-1">(черновик)</span>}
           {isPastSlot && <span className="text-xs text-gray-500 ml-1">(прошло)</span>}
         </div>
         
-        {slot.slot_details.description && (
+        {slot.slot_details?.description && (
           <div className="text-xs truncate opacity-75 mt-1">
             {slot.slot_details.description}
           </div>
         )}
         
-        {slot.slot_details.type !== 'event' && !isPastSlot && (
+        {(slot.slot_details?.type === 'rent' || slot.slot_details?.type === 'booking') && !isPastSlot && (
           <div className="flex items-center gap-1 mt-2">
             <button 
               onClick={(e) => {
@@ -246,7 +246,7 @@ const AdminCalendarPage: React.FC = () => {
             <button 
               onClick={(e) => {
                 e.stopPropagation();
-                onDelete(slot.id, slot.slot_details.type);
+                onDelete(slot.id, slot.slot_details?.type);
               }}
               className="p-1 rounded bg-white/80 hover:bg-white text-red-600 hover:text-red-800 transition-colors"
               title="Удалить"
@@ -360,6 +360,10 @@ const AdminCalendarPage: React.FC = () => {
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 bg-blue-200 border-l-4 border-blue-500 rounded-sm" />
               <span className="text-gray-600 dark:text-gray-300">Аренда</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-purple-200 border-l-4 border-purple-500 rounded-sm" />
+              <span className="text-gray-600 dark:text-gray-300">Бронирования</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 bg-gray-100 border-l-4 border-gray-300 rounded-sm" />
