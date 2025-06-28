@@ -398,7 +398,7 @@ const AdminCalendarPage: React.FC = () => {
                   className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
                 >
                   <Plus className="w-4 h-4" />
-                  Создать событие
+                  Создать событие 
                 </button>
               </div>
             )}
