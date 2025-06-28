@@ -131,7 +131,7 @@ const AdminCalendarPage: React.FC = () => {
       }
 
       const { data, error } = await supabase
-        .from('calendar_slots')
+        .from('time_slots_table')
         .select('*')
         .gte('start_at', startDate.toISOString())
         .lte('start_at', endDate.toISOString())
@@ -163,7 +163,7 @@ const AdminCalendarPage: React.FC = () => {
     
     try {
       const { error } = await supabase
-        .from('calendar_slots')
+        .from('time_slots_table')
         .delete()
         .eq('id', slotId);
 
