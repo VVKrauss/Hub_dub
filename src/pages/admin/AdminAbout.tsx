@@ -778,7 +778,7 @@ const AdminAbout: React.FC = () => {
                           src={platform.logo}
                           alt={platform.platform}
                           className="w-8 h-8 object-cover mb-2"   
-                        />
+                        /> 
                       )}
                       <h4 className="font-medium text-gray-900 dark:text-white text-sm">{platform.platform}</h4>
                       <a href={platform.url} target="_blank" rel="noopener noreferrer" className="text-primary-600 dark:text-primary-400 text-xs hover:underline break-all">
