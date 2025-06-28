@@ -391,7 +391,7 @@ const AdminCalendarPage: React.FC = () => {
               <div className="p-2 bg-gray-100 dark:bg-gray-700 rounded-lg text-gray-600 dark:text-gray-300">
                 <Calendar className="w-5 h-5" />
               </div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Календарь слотов</h1>
+              <h1 className="text-2xl font-bold text-gray-600 dark:text-white">Календарь слотов</h1>
             </div>
             
             <div className="flex items-center gap-3">
