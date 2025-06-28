@@ -1,0 +1,323 @@
+// src/types/events.ts - Упрощенные типы для системы регистраций
+
+export type PaymentType = 'free' | 'donation' | 'paid';
+
+export type RegistrationStatus = 'active' | 'cancelled';
+
+export type PaymentStatus = 'free' | 'donation' | 'venue' | 'online_pending' | 'online_paid';
+
+// Упрощенная структура регистрации
+export interface SimpleRegistration {
+  id: string;
+  full_name: string;
+  email: string;
+  phone?: string;
+  tickets: number;
+  total_amount: number;
+  payment_status: PaymentStatus;
+  status: RegistrationStatus;
+  qr_code: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+// Упрощенная структура регистраций для события
+export interface SimpleEventRegistrations {
+  max_registrations: number;
+  current_registrations: number;
+  registrations: SimpleRegistration[];
+  registration_enabled: boolean;
+  registration_deadline?: string;
+}
+
+// Упрощенная структура события
+export interface SimpleEvent {
+  id: string;
+  title: string;
+  description: string;
+  event_type: string;
+  bg_image?: string;
+  start_at: string;
+  end_at: string;
+  location?: string;
+  age_category: string;
+  
+  // Упрощенная система оплаты
+  payment_type: PaymentType;
+  price: number;
+  currency: string;
+  
+  // Упрощенная онлайн оплата (только одна опция)
+  online_payment_url?: string; // Либо ссылка, либо Oblakkarte ID
+  online_payment_type?: 'link' | 'oblakkarte';
+  
+  // Упрощенные регистрации
+  registrations: SimpleEventRegistrations;
+  
+  // Остальные поля остаются как есть
+  status: string;
+  languages?: string[];
+  speakers?: string[];
+  video_url?: string;
+  photo_gallery?: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+// Хелперы для работы с упрощенной системой
+export class EventRegistrationHelper {
+  
+  /**
+   * Проверяет, доступна ли регистрация
+   */
+  static isRegistrationAvailable(event: SimpleEvent): boolean {
+    if (!event.registrations.registration_enabled) return false;
+    
+    // Проверяем дедлайн
+    if (event.registrations.registration_deadline) {
+      const deadline = new Date(event.registrations.registration_deadline);
+      if (new Date() > deadline) return false;
+    }
+    
+    // Проверяем свободные места
+    const spotsLeft = event.registrations.max_registrations - event.registrations.current_registrations;
+    return spotsLeft > 0;
+  }
+  
+  /**
+   * Получает количество свободных мест
+   */
+  static getAvailableSpots(event: SimpleEvent): number {
+    return Math.max(0, event.registrations.max_registrations - event.registrations.current_registrations);
+  }
+  
+  /**
+   * Проверяет, можно ли зарегистрироваться с указанным количеством билетов
+   */
+  static canRegisterWithTickets(event: SimpleEvent, ticketCount: number): boolean {
+    return this.getAvailableSpots(event) >= ticketCount;
+  }
+  
+  /**
+   * Создает новую регистрацию
+   */
+  static createRegistration(
+    formData: {
+      fullName: string;
+      email: string;
+      phone?: string;
+      tickets: number;
+    },
+    event: SimpleEvent
+  ): SimpleRegistration {
+    const registrationId = crypto.randomUUID();
+    const totalAmount = event.payment_type === 'paid' ? (event.price * formData.tickets) : 0;
+    
+    let paymentStatus: PaymentStatus;
+    switch (event.payment_type) {
+      case 'free':
+        paymentStatus = 'free';
+        break;
+      case 'donation':
+        paymentStatus = 'donation';
+        break;
+      case 'paid':
+        paymentStatus = 'venue'; // По умолчанию оплата на месте
+        break;
+      default:
+        paymentStatus = 'venue';
+    }
+    
+    return {
+      id: registrationId,
+      full_name: formData.fullName,
+      email: formData.email.toLowerCase().trim(),
+      phone: formData.phone || '',
+      tickets: formData.tickets,
+      total_amount: totalAmount,
+      payment_status: paymentStatus,
+      status: 'active',
+      qr_code: `${event.id}-${registrationId}`,
+      created_at: new Date().toISOString()
+    };
+  }
+  
+  /**
+   * Обновляет регистрации события после добавления новой
+   */
+  static addRegistrationToEvent(
+    event: SimpleEvent, 
+    registration: SimpleRegistration
+  ): SimpleEventRegistrations {
+    return {
+      ...event.registrations,
+      current_registrations: event.registrations.current_registrations + registration.tickets,
+      registrations: [...event.registrations.registrations, registration]
+    };
+  }
+  
+  /**
+   * Отменяет регистрацию
+   */
+  static cancelRegistration(
+    event: SimpleEvent, 
+    registrationId: string
+  ): SimpleEventRegistrations {
+    const registration = event.registrations.registrations.find(r => r.id === registrationId);
+    if (!registration) return event.registrations;
+    
+    const updatedRegistrations = event.registrations.registrations.map(r => 
+      r.id === registrationId ? { ...r, status: 'cancelled' as RegistrationStatus } : r
+    );
+    
+    return {
+      ...event.registrations,
+      current_registrations: event.registrations.current_registrations - registration.tickets,
+      registrations: updatedRegistrations
+    };
+  }
+  
+  /**
+   * Получает активные регистрации
+   */
+  static getActiveRegistrations(event: SimpleEvent): SimpleRegistration[] {
+    return event.registrations.registrations.filter(r => r.status === 'active');
+  }
+  
+  /**
+   * Получает регистрацию по email
+   */
+  static findRegistrationByEmail(event: SimpleEvent, email: string): SimpleRegistration | null {
+    return event.registrations.registrations.find(
+      r => r.email.toLowerCase() === email.toLowerCase() && r.status === 'active'
+    ) || null;
+  }
+  
+  /**
+   * Проверяет статус оплаты события
+   */
+  static getPaymentInfo(event: SimpleEvent) {
+    return {
+      isFree: event.payment_type === 'free',
+      isDonation: event.payment_type === 'donation',
+      isPaid: event.payment_type === 'paid',
+      hasOnlinePayment: !!event.online_payment_url,
+      priceText: event.payment_type === 'free' ? 'Бесплатно' : 
+                event.payment_type === 'donation' ? 'Донат' : 
+                `${event.price} ${event.currency}`
+    };
+  }
+}
+
+// Миграция из старой системы в новую
+export class EventMigrationHelper {
+  
+  /**
+   * Конвертирует старую структуру регистраций в новую
+   */
+  static migrateEventRegistrations(oldEvent: any): SimpleEventRegistrations {
+    let registrations: SimpleRegistration[] = [];
+    let maxRegistrations = 50;
+    let currentRegistrations = 0;
+    
+    // Обрабатываем старую структуру
+    if (oldEvent.registrations?.reg_list) {
+      registrations = oldEvent.registrations.reg_list.map((oldReg: any) => ({
+        id: oldReg.id,
+        full_name: oldReg.full_name,
+        email: oldReg.email,
+        phone: oldReg.phone || '',
+        tickets: (oldReg.adult_tickets || 0) + (oldReg.child_tickets || 0),
+        total_amount: oldReg.total_amount || 0,
+        payment_status: oldReg.status ? 'venue' : 'cancelled',
+        status: oldReg.status ? 'active' : 'cancelled',
+        qr_code: oldReg.qr_code || `${oldEvent.id}-${oldReg.id}`,
+        created_at: oldReg.created_at || new Date().toISOString()
+      }));
+      
+      maxRegistrations = oldEvent.registrations.max_regs || 50;
+      currentRegistrations = registrations
+        .filter(r => r.status === 'active')
+        .reduce((sum, r) => sum + r.tickets, 0);
+    }
+    
+    // Или из registrations_list
+    else if (oldEvent.registrations_list) {
+      registrations = oldEvent.registrations_list.map((oldReg: any) => ({
+        id: oldReg.id,
+        full_name: oldReg.full_name,
+        email: oldReg.email,
+        phone: oldReg.phone || '',
+        tickets: (oldReg.adult_tickets || 0) + (oldReg.child_tickets || 0),
+        total_amount: oldReg.total_amount || 0,
+        payment_status: oldReg.status ? 'venue' : 'cancelled',
+        status: oldReg.status ? 'active' : 'cancelled',
+        qr_code: oldReg.qr_code || `${oldEvent.id}-${oldReg.id}`,
+        created_at: oldReg.created_at || new Date().toISOString()
+      }));
+      
+      maxRegistrations = oldEvent.max_registrations || 50;
+      currentRegistrations = registrations
+        .filter(r => r.status === 'active')
+        .reduce((sum, r) => sum + r.tickets, 0);
+    }
+    
+    return {
+      max_registrations: maxRegistrations,
+      current_registrations: currentRegistrations,
+      registrations: registrations,
+      registration_enabled: oldEvent.registration_enabled !== false,
+      registration_deadline: oldEvent.registration_deadline
+    };
+  }
+  
+  /**
+   * Конвертирует старое событие в новый формат
+   */
+  static migrateEvent(oldEvent: any): SimpleEvent {
+    // Определяем тип оплаты
+    let paymentType: PaymentType = 'free';
+    if (oldEvent.payment_type === 'cost' || oldEvent.payment_type === 'paid') {
+      paymentType = 'paid';
+    } else if (oldEvent.payment_type === 'donation') {
+      paymentType = 'donation';
+    }
+    
+    // Определяем онлайн оплату
+    let onlinePaymentUrl: string | undefined;
+    let onlinePaymentType: 'link' | 'oblakkarte' | undefined;
+    
+    if (oldEvent.oblakkarte_data_event_id) {
+      onlinePaymentUrl = oldEvent.oblakkarte_data_event_id;
+      onlinePaymentType = 'oblakkarte';
+    } else if (oldEvent.payment_link) {
+      onlinePaymentUrl = oldEvent.payment_link;
+      onlinePaymentType = 'link';
+    }
+    
+    return {
+      id: oldEvent.id,
+      title: oldEvent.title,
+      description: oldEvent.description,
+      event_type: oldEvent.event_type,
+      bg_image: oldEvent.bg_image,
+      start_at: oldEvent.start_at,
+      end_at: oldEvent.end_at,
+      location: oldEvent.location,
+      age_category: oldEvent.age_category,
+      payment_type: paymentType,
+      price: oldEvent.price || 0,
+      currency: oldEvent.currency || 'RSD',
+      online_payment_url: onlinePaymentUrl,
+      online_payment_type: onlinePaymentType,
+      registrations: this.migrateEventRegistrations(oldEvent),
+      status: oldEvent.status,
+      languages: oldEvent.languages,
+      speakers: oldEvent.speakers,
+      video_url: oldEvent.video_url,
+      photo_gallery: oldEvent.photo_gallery,
+      created_at: oldEvent.created_at,
+      updated_at: oldEvent.updated_at || new Date().toISOString()
+    };
+  }
+}
