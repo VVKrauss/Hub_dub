@@ -32,7 +32,7 @@ interface TeamMember {
   contacts?: {
     email?: string;
     linkedin?: string;
-    twitter?: string;
+    twitter?: string; 
   };
 }
 
