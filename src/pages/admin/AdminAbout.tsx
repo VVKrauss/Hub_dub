@@ -472,7 +472,8 @@ const AdminAbout: React.FC = () => {
             </div>
           </div>
 
-         // src/pages/admin/AdminAbout.tsx - Часть 4: Блоки команды и контрибьюторов
+         {/* // src/pages/admin/AdminAbout.tsx - Часть 4: Блоки команды и контрибьюторов */}
+// src/pages/admin/AdminAbout.tsx - Часть 4: Блоки команды и контрибьюторов
 
           {/* Команда */}
           <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
@@ -511,7 +512,7 @@ const AdminAbout: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-1">
                       <button
-                        onClick={() => editTeamMember(index)}
+                        onClick={() => handleEditTeamMember(index)}
                         className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
                       >
                         <Edit className="w-3 h-3" />
@@ -615,7 +616,7 @@ const AdminAbout: React.FC = () => {
                               placeholder="https://example.com"
                             />
                             <button
-                              onClick={() => editContributor(index)}
+                              onClick={() => handleEditContributor(index)}
                               className="p-2 text-gray-400 hover:text-blue-600 transition-colors flex-shrink-0"
                               title="Редактировать фото"
                             >
@@ -746,6 +747,7 @@ const AdminAbout: React.FC = () => {
             )}
           </div>
 
+          
           {/* // src/pages/admin/AdminAbout.tsx - Часть 5: Платформы поддержки и модальные окна
  */}
           {/* Платформы поддержки */}
