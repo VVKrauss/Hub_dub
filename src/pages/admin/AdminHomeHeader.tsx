@@ -1,4 +1,4 @@
-// src/pages/admin/AdminHomeHeader.tsx - Версия для существующей site_settings
+// src/pages/admin/AdminHomeHeader.tsx - Унифицированная версия
 import React, { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { 
@@ -30,24 +30,23 @@ interface SectionConfig {
   image?: string;
 }
 
-interface SiteSettings {
-  id?: string;
-  header_settings?: {
+interface HomeSettings {
+  hero_section: {
     enabled: boolean;
     title: string;
     subtitle: string;
     background_image?: string;
   };
-  info_section?: SectionConfig;
-  rent_selection?: SectionConfig;
-  coworking_selection?: SectionConfig;
-  navigation_items?: any[];
+  info_section: SectionConfig;
+  rent_section: SectionConfig;
+  coworking_section: SectionConfig;
+  events_section: SectionConfig;
 }
 
 const AdminHomeHeader: React.FC = () => {
   // Состояния
-  const [settings, setSettings] = useState<SiteSettings>({
-    header_settings: {
+  const [settings, setSettings] = useState<HomeSettings>({
+    hero_section: {
       enabled: true,
       title: '',
       subtitle: '',
@@ -58,17 +57,23 @@ const AdminHomeHeader: React.FC = () => {
       description: '',
       order: 1,
     },
-    rent_selection: {
+    rent_section: {
       enabled: true,
       title: '',
       description: '',
       order: 2,
     },
-    coworking_selection: {
+    coworking_section: {
       enabled: true,
       title: '',
       description: '',
       order: 3,
+    },
+    events_section: {
+      enabled: true,
+      title: '',
+      description: '',
+      order: 4,
     }
   });
   const [loading, setLoading] = useState(true);
@@ -86,43 +91,18 @@ const AdminHomeHeader: React.FC = () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('site_settings')
+        .from('home_settings')
         .select('*')
         .single();
 
       if (error && error.code !== 'PGRST116') throw error;
       
       if (data) {
-        setSettings({
-          id: data.id,
-          header_settings: data.header_settings || {
-            enabled: true,
-            title: 'Добро пожаловать',
-            subtitle: 'Место для работы, обучения и встреч'
-          },
-          info_section: data.info_section || {
-            enabled: true,
-            title: 'О нас',
-            description: 'Описание организации',
-            order: 1
-          },
-          rent_selection: data.rent_selection || {
-            enabled: true,
-            title: 'Аренда помещений',
-            description: 'Описание услуг аренды',
-            order: 2
-          },
-          coworking_selection: data.coworking_selection || {
-            enabled: true,
-            title: 'Коворкинг пространство',
-            description: 'Описание коворкинга',
-            order: 3
-          }
-        });
+        setSettings(data);
       }
     } catch (error) {
-      console.error('Error fetching site settings:', error);
-      toast.error('Ошибка при загрузке настроек сайта');
+      console.error('Error fetching home settings:', error);
+      toast.error('Ошибка при загрузке настроек главной страницы');
     } finally {
       setLoading(false);
     }
@@ -132,48 +112,29 @@ const AdminHomeHeader: React.FC = () => {
   const handleSave = async () => {
     try {
       setSaving(true);
-      
-      const updateData = {
-        header_settings: settings.header_settings,
-        info_section: settings.info_section,
-        rent_selection: settings.rent_selection,
-        coworking_selection: settings.coworking_selection
-      };
+      const { error } = await supabase
+        .from('home_settings')
+        .upsert(settings);
 
-      let result;
-      if (settings.id) {
-        // Обновляем существующую запись
-        result = await supabase
-          .from('site_settings')
-          .update(updateData)
-          .eq('id', settings.id);
-      } else {
-        // Создаем новую запись
-        result = await supabase
-          .from('site_settings')
-          .insert([updateData]);
-      }
-
-      if (result.error) throw result.error;
+      if (error) throw error;
       
-      toast.success('Настройки сохранены');
-      await fetchSettings(); // Перезагружаем данные
+      toast.success('Настройки главной страницы сохранены');
     } catch (error) {
-      console.error('Error saving settings:', error);
+      console.error('Error saving home settings:', error);
       toast.error('Ошибка при сохранении настроек');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>, sectionType: string) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     try {
       setIsUploading(true);
       const fileExt = file.name.split('.').pop();
-      const fileName = `header_${Date.now()}.${fileExt}`;
+      const fileName = `home_${sectionType}_${Date.now()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from('images')
@@ -181,13 +142,20 @@ const AdminHomeHeader: React.FC = () => {
 
       if (uploadError) throw uploadError;
 
-      setSettings(prev => ({
-        ...prev,
-        header_settings: { 
-          ...prev.header_settings!, 
-          background_image: fileName 
-        }
-      }));
+      if (sectionType === 'hero') {
+        setSettings(prev => ({
+          ...prev,
+          hero_section: { ...prev.hero_section, background_image: fileName }
+        }));
+      } else {
+        setSettings(prev => ({
+          ...prev,
+          [`${sectionType}_section`]: { 
+            ...prev[`${sectionType}_section` as keyof typeof prev] as SectionConfig, 
+            image: fileName 
+          }
+        }));
+      }
 
       toast.success('Изображение загружено');
     } catch (error) {
@@ -198,13 +166,20 @@ const AdminHomeHeader: React.FC = () => {
     }
   };
 
+  const updateSectionConfig = (sectionKey: keyof HomeSettings, updates: Partial<SectionConfig>) => {
+    setSettings(prev => ({
+      ...prev,
+      [sectionKey]: { ...prev[sectionKey], ...updates }
+    }));
+  };
+
   // === СОСТОЯНИЕ ЗАГРУЗКИ ===
   if (loading) {
     return (
       <div className="flex justify-center items-center py-12">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-300">Загрузка настроек...</p>
+          <p className="text-gray-600 dark:text-gray-300">Загрузка настроек главной страницы...</p>
         </div>
       </div>
     );
@@ -224,34 +199,44 @@ const AdminHomeHeader: React.FC = () => {
         </div>
         
         {/* Hero Section Preview */}
-        {settings.header_settings?.enabled && (
+        {settings.hero_section.enabled && (
           <div className="relative h-96 bg-gradient-to-r from-primary-600 to-primary-800 flex items-center justify-center text-white">
-            {settings.header_settings.background_image && (
+            {settings.hero_section.background_image && (
               <img
-                src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/images/${settings.header_settings.background_image}`}
+                src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/images/${settings.hero_section.background_image}`}
                 alt="Hero background"
                 className="absolute inset-0 w-full h-full object-cover opacity-50"
               />
             )}
             <div className="relative z-10 text-center">
-              <h1 className="text-4xl font-bold mb-4">{settings.header_settings.title}</h1>
-              <p className="text-xl">{settings.header_settings.subtitle}</p>
+              <h1 className="text-4xl font-bold mb-4">{settings.hero_section.title}</h1>
+              <p className="text-xl">{settings.hero_section.subtitle}</p>
             </div>
           </div>
         )}
 
         {/* Sections Preview */}
         <div className="container mx-auto px-4 py-16 space-y-16">
-          {settings.info_section?.enabled && (
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-8 shadow-sm">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-                {settings.info_section.title}
-              </h2>
-              <p className="text-gray-600 dark:text-gray-300">
-                {settings.info_section.description}
-              </p>
-            </div>
-          )}
+          {Object.entries(settings)
+            .filter(([key, section]) => key !== 'hero_section' && (section as SectionConfig).enabled)
+            .sort(([, a], [, b]) => (a as SectionConfig).order - (b as SectionConfig).order)
+            .map(([key, section]) => (
+              <div key={key} className="bg-white dark:bg-gray-800 rounded-lg p-8 shadow-sm">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+                  {(section as SectionConfig).title}
+                </h2>
+                <p className="text-gray-600 dark:text-gray-300">
+                  {(section as SectionConfig).description}
+                </p>
+                {(section as SectionConfig).image && (
+                  <img
+                    src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/images/${(section as SectionConfig).image}`}
+                    alt={(section as SectionConfig).title}
+                    className="w-full h-48 object-cover rounded-lg mt-4"
+                  />
+                )}
+              </div>
+            ))}
         </div>
       </div>
     );
@@ -309,27 +294,24 @@ const AdminHomeHeader: React.FC = () => {
           <input
             type="file"
             ref={fileInputRef}
-            onChange={handleImageUpload}
+            onChange={(e) => handleImageUpload(e, 'hero')}
             accept="image/*"
             className="hidden"
           />
 
-          {/* Главный баннер */}
+          {/* Hero Section */}
           <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <ImageIcon className="w-5 h-5 text-gray-500" />
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Главный баннер</h3>
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Главный баннер (Hero)</h3>
               </div>
               <input
                 type="checkbox"
-                checked={settings.header_settings?.enabled || false}
+                checked={settings.hero_section.enabled}
                 onChange={(e) => setSettings(prev => ({
                   ...prev,
-                  header_settings: { 
-                    ...prev.header_settings!, 
-                    enabled: e.target.checked 
-                  }
+                  hero_section: { ...prev.hero_section, enabled: e.target.checked }
                 }))}
                 className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500"
               />
@@ -338,20 +320,17 @@ const AdminHomeHeader: React.FC = () => {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Заголовок
+                  Основной заголовок
                 </label>
                 <input
                   type="text"
-                  value={settings.header_settings?.title || ''}
+                  value={settings.hero_section.title}
                   onChange={(e) => setSettings(prev => ({
                     ...prev,
-                    header_settings: { 
-                      ...prev.header_settings!, 
-                      title: e.target.value 
-                    }
+                    hero_section: { ...prev.hero_section, title: e.target.value }
                   }))}
                   className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
-                  placeholder="Добро пожаловать"
+                  placeholder="Добро пожаловать в наше пространство"
                 />
               </div>
               
@@ -361,94 +340,129 @@ const AdminHomeHeader: React.FC = () => {
                 </label>
                 <input
                   type="text"
-                  value={settings.header_settings?.subtitle || ''}
+                  value={settings.hero_section.subtitle}
                   onChange={(e) => setSettings(prev => ({
                     ...prev,
-                    header_settings: { 
-                      ...prev.header_settings!, 
-                      subtitle: e.target.value 
-                    }
+                    hero_section: { ...prev.hero_section, subtitle: e.target.value }
                   }))}
                   className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
                   placeholder="Место для работы, обучения и встреч"
                 />
               </div>
+
+              {/* Фоновое изображение */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Фоновое изображение
+                </label>
+                {settings.hero_section.background_image ? (
+                  <div className="relative">
+                    <img
+                      src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/images/${settings.hero_section.background_image}`}
+                      alt="Hero background"
+                      className="w-full h-32 object-cover rounded-lg border border-gray-200 dark:border-gray-600"
+                    />
+                    <button
+                      onClick={() => setSettings(prev => ({
+                        ...prev,
+                        hero_section: { ...prev.hero_section, background_image: undefined }
+                      }))}
+                      className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full opacity-80 hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                    className="w-full h-32 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-primary-400 dark:hover:border-primary-500 transition-colors bg-white dark:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex flex-col items-center justify-center"
+                  >
+                    {isUploading ? (
+                      <Loader2 className="w-6 h-6 animate-spin text-primary-500" />
+                    ) : (
+                      <>
+                        <Upload className="w-6 h-6 text-gray-400 mb-2" />
+                        <span className="text-sm text-gray-500 dark:text-gray-400">
+                          Загрузить фоновое изображение
+                        </span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Секции */}
-          {(['info_section', 'rent_selection', 'coworking_selection'] as const).map((sectionKey) => {
-            const section = settings[sectionKey];
-            const icons = {
-              info_section: Info,
-              rent_selection: Building2,
-              coworking_selection: Users
-            };
-            const titles = {
-              info_section: 'Блок "О нас"',
-              rent_selection: 'Блок "Аренда"',
-              coworking_selection: 'Блок "Коворкинг"'
-            };
-            
-            const IconComponent = icons[sectionKey];
-            const sectionTitle = titles[sectionKey];
+          {/* Page Sections */}
+          {Object.entries(settings)
+            .filter(([key]) => key !== 'hero_section')
+            .map(([key, section]) => {
+              const sectionData = section as SectionConfig;
+              const icons = {
+                info_section: Info,
+                rent_section: Building2,
+                coworking_section: Users,
+                events_section: Clock
+              };
+              const titles = {
+                info_section: 'Блок "О нас"',
+                rent_section: 'Блок "Аренда помещений"',
+                coworking_section: 'Блок "Коворкинг пространство"',
+                events_section: 'Блок "Мероприятия"'
+              };
+              
+              const IconComponent = icons[key as keyof typeof icons];
+              const sectionTitle = titles[key as keyof typeof titles];
 
-            return (
-              <div key={sectionKey} className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <IconComponent className="w-5 h-5 text-gray-500" />
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white">{sectionTitle}</h3>
+              return (
+                <div key={key} className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <IconComponent className="w-5 h-5 text-gray-500" />
+                      <h3 className="text-lg font-medium text-gray-900 dark:text-white">{sectionTitle}</h3>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="number"
+                        value={sectionData.order}
+                        onChange={(e) => updateSectionConfig(key as keyof HomeSettings, { order: Number(e.target.value) })}
+                        className="w-16 p-2 border border-gray-200 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                        min="1"
+                        title="Порядок отображения"
+                      />
+                      <input
+                        type="checkbox"
+                        checked={sectionData.enabled}
+                        onChange={(e) => updateSectionConfig(key as keyof HomeSettings, { enabled: e.target.checked })}
+                        className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500"
+                      />
+                    </div>
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={section?.enabled || false}
-                    onChange={(e) => setSettings(prev => ({
-                      ...prev,
-                      [sectionKey]: { 
-                        ...prev[sectionKey]!, 
-                        enabled: e.target.checked 
-                      }
-                    }))}
-                    className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500"
-                  />
+                  
+                  <div className="space-y-3">
+                    <input
+                      type="text"
+                      value={sectionData.title}
+                      onChange={(e) => updateSectionConfig(key as keyof HomeSettings, { title: e.target.value })}
+                      placeholder="Заголовок раздела"
+                      className="w-full p-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-sm"
+                    />
+                    <textarea
+                      value={sectionData.description}
+                      onChange={(e) => updateSectionConfig(key as keyof HomeSettings, { description: e.target.value })}
+                      rows={3}
+                      placeholder="Описание раздела"
+                      className="w-full p-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all resize-none text-sm"
+                    />
+                  </div>
                 </div>
-                
-                <div className="space-y-3">
-                  <input
-                    type="text"
-                    value={section?.title || ''}
-                    onChange={(e) => setSettings(prev => ({
-                      ...prev,
-                      [sectionKey]: { 
-                        ...prev[sectionKey]!, 
-                        title: e.target.value 
-                      }
-                    }))}
-                    placeholder="Заголовок раздела"
-                    className="w-full p-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-sm"
-                  />
-                  <textarea
-                    value={section?.description || ''}
-                    onChange={(e) => setSettings(prev => ({
-                      ...prev,
-                      [sectionKey]: { 
-                        ...prev[sectionKey]!, 
-                        description: e.target.value 
-                      }
-                    }))}
-                    rows={3}
-                    placeholder="Описание раздела"
-                    className="w-full p-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all resize-none text-sm"
-                  />
-                </div>
-              </div>
-            );
-          })}
+              );
+            })}
         </div>
       </div>
     </div>
   );
 };
 
-export default AdminHomeHeader; 
+export default AdminHomeHeader;

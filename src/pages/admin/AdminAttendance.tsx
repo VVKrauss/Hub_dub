@@ -78,48 +78,44 @@ const AdminAttendance = () => {
   const fetchStats = async () => {
     try {
       const now = new Date();
-      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const startOfWeek = subDays(startOfToday, 7);
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const startOfWeek = subDays(now, 7);
       const startOfMonthDate = startOfMonth(now);
 
-      // Получаем статистику посещений
-      const { data: attendanceData, error } = await supabase
-        .from('attendance_records')
-        .select('*, user_profile:profiles(name)')
-        .order('scanned_at', { ascending: false });
+      const { data, error } = await supabase
+        .from('user_attendance')
+        .select(`
+          id,
+          scanned_at,
+          attendance_type,
+          user_id
+        `);
 
       if (error) throw error;
 
-      const records = attendanceData || [];
+      const todayRecords = data.filter(record => 
+        new Date(record.scanned_at) >= startOfDay
+      );
+      
+      const weekRecords = data.filter(record => 
+        new Date(record.scanned_at) >= startOfWeek
+      );
+      
+      const monthRecords = data.filter(record => 
+        new Date(record.scanned_at) >= startOfMonthDate
+      );
 
-      // Считаем статистику
-      const totalToday = records.filter(r => new Date(r.scanned_at) >= startOfToday).length;
-      const totalThisWeek = records.filter(r => new Date(r.scanned_at) >= startOfWeek).length;
-      const totalThisMonth = records.filter(r => new Date(r.scanned_at) >= startOfMonthDate).length;
-
-      const uniqueUsersToday = new Set(
-        records
-          .filter(r => new Date(r.scanned_at) >= startOfToday)
-          .map(r => r.user_id)
-      ).size;
-
-      const uniqueUsersThisMonth = new Set(
-        records
-          .filter(r => new Date(r.scanned_at) >= startOfMonthDate)
-          .map(r => r.user_id)
-      ).size;
-
-      const eventAttendance = records.filter(r => r.attendance_type === 'event').length;
-      const generalAttendance = records.filter(r => r.attendance_type !== 'event').length;
+      const uniqueUsersToday = new Set(todayRecords.map(r => r.user_id)).size;
+      const uniqueUsersThisMonth = new Set(monthRecords.map(r => r.user_id)).size;
 
       setStats({
-        totalToday,
-        totalThisWeek,
-        totalThisMonth,
+        totalToday: todayRecords.length,
+        totalThisWeek: weekRecords.length,
+        totalThisMonth: monthRecords.length,
         uniqueUsersToday,
         uniqueUsersThisMonth,
-        eventAttendance,
-        generalAttendance
+        eventAttendance: data.filter(r => r.attendance_type === 'event').length,
+        generalAttendance: data.filter(r => r.attendance_type === 'general').length
       });
     } catch (error) {
       console.error('Error fetching stats:', error);
@@ -129,28 +125,24 @@ const AdminAttendance = () => {
   const fetchAttendanceRecords = async (pageNum: number) => {
     try {
       let query = supabase
-        .from('attendance_records')
+        .from('user_attendance')
         .select(`
           *,
-          user_profile:profiles!attendance_records_user_id_fkey(name),
-          scanned_by_profile:profiles!attendance_records_scanned_by_fkey(name),
+          user_profile:profiles!user_attendance_user_id_fkey(name),
+          scanned_by_profile:profiles!user_attendance_scanned_by_fkey(name),
           event:events(title, event_type)
         `)
         .order('scanned_at', { ascending: false });
 
       // Применяем фильтры
       if (filterType !== 'all') {
-        if (filterType === 'event') {
-          query = query.eq('attendance_type', 'event');
-        } else {
-          query = query.neq('attendance_type', 'event');
-        }
+        query = query.eq('attendance_type', filterType);
       }
 
       if (dateFilter !== 'all') {
         const now = new Date();
         let startDate: Date;
-
+        
         switch (dateFilter) {
           case 'today':
             startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -164,34 +156,36 @@ const AdminAttendance = () => {
           default:
             startDate = new Date(0);
         }
-
+        
         query = query.gte('scanned_at', startDate.toISOString());
       }
 
+      // Поиск по имени пользователя
       if (searchTerm) {
-        // Поиск по имени пользователя
-        const { data: profiles, error: profilesError } = await supabase
+        // Для поиска нам нужно сначала найти пользователей, затем их посещения
+        const { data: users, error: usersError } = await supabase
           .from('profiles')
           .select('id')
           .ilike('name', `%${searchTerm}%`);
 
-        if (profilesError) throw profilesError;
+        if (usersError) throw usersError;
 
-        const userIds = profiles?.map(p => p.id) || [];
-        if (userIds.length > 0) {
+        if (users && users.length > 0) {
+          const userIds = users.map(u => u.id);
           query = query.in('user_id', userIds);
         } else {
-          // Если нет подходящих пользователей, возвращаем пустой результат
-          if (pageNum === 1) {
-            setAttendanceRecords([]);
-          }
+          // Если пользователи не найдены, возвращаем пустой результат
+          setAttendanceRecords([]);
           setHasMore(false);
           return;
         }
       }
 
-      const { data, error } = await query
-        .range((pageNum - 1) * ITEMS_PER_PAGE, pageNum * ITEMS_PER_PAGE - 1);
+      const from = (pageNum - 1) * ITEMS_PER_PAGE;
+      const to = from + ITEMS_PER_PAGE - 1;
+      query = query.range(from, to);
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -201,7 +195,7 @@ const AdminAttendance = () => {
         setAttendanceRecords(prev => [...prev, ...(data || [])]);
       }
 
-      setHasMore((data || []).length === ITEMS_PER_PAGE);
+      setHasMore((data?.length || 0) === ITEMS_PER_PAGE);
       setPage(pageNum);
     } catch (error) {
       console.error('Error fetching attendance records:', error);
@@ -212,20 +206,34 @@ const AdminAttendance = () => {
   const exportData = async () => {
     try {
       const { data, error } = await supabase
-        .from('attendance_records')
+        .from('user_attendance')
         .select(`
-          *,
-          user_profile:profiles!attendance_records_user_id_fkey(name),
-          scanned_by_profile:profiles!attendance_records_scanned_by_fkey(name),
+          scanned_at,
+          attendance_type,
+          location,
+          notes,
+          user_profile:profiles!user_attendance_user_id_fkey(name),
+          scanned_by_profile:profiles!user_attendance_scanned_by_fkey(name),
           event:events(title, event_type)
         `)
         .order('scanned_at', { ascending: false });
 
       if (error) throw error;
 
+      // Создаем CSV
+      const headers = [
+        'Дата и время',
+        'Пользователь',
+        'Тип посещения',
+        'Мероприятие',
+        'Местоположение',
+        'Заметки',
+        'Отметил'
+      ];
+
       const csvContent = [
-        'Дата,Пользователь,Тип,Мероприятие,Место,Заметки,Отметил',
-        ...(data || []).map(record => [
+        headers.join(','),
+        ...data.map(record => [
           format(new Date(record.scanned_at), 'dd.MM.yyyy HH:mm'),
           `"${record.user_profile.name}"`,
           record.attendance_type === 'event' ? 'Мероприятие' : 'Общее',
@@ -298,16 +306,16 @@ const AdminAttendance = () => {
 
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-gradient-to-br from-primary-50 to-primary-100 dark:from-primary-900/20 dark:to-primary-800/20 p-6 rounded-xl">
+        <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 p-6 rounded-xl">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-primary-600 dark:text-primary-400 mb-1">Сегодня</p>
-              <p className="text-3xl font-bold text-primary-700 dark:text-primary-300">{stats.totalToday}</p>
-              <p className="text-xs text-primary-500 dark:text-primary-400 mt-1">
+              <p className="text-sm text-blue-600 dark:text-blue-400 mb-1">Сегодня</p>
+              <p className="text-3xl font-bold text-blue-700 dark:text-blue-300">{stats.totalToday}</p>
+              <p className="text-xs text-blue-500 dark:text-blue-400 mt-1">
                 {stats.uniqueUsersToday} уникальных пользователей
               </p>
             </div>
-            <Calendar className="h-12 w-12 text-primary-500 opacity-80" />
+            <Calendar className="h-12 w-12 text-blue-500 opacity-80" />
           </div>
         </div>
 
@@ -322,39 +330,43 @@ const AdminAttendance = () => {
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-secondary-50 to-secondary-100 dark:from-secondary-900/20 dark:to-secondary-800/20 p-6 rounded-xl">
+        <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 p-6 rounded-xl">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-secondary-600 dark:text-secondary-400 mb-1">За месяц</p>
-              <p className="text-3xl font-bold text-secondary-700 dark:text-secondary-300">{stats.totalThisMonth}</p>
-              <p className="text-xs text-secondary-500 dark:text-secondary-400 mt-1">посещений</p>
+              <p className="text-sm text-purple-600 dark:text-purple-400 mb-1">За месяц</p>
+              <p className="text-3xl font-bold text-purple-700 dark:text-purple-300">{stats.totalThisMonth}</p>
+              <p className="text-xs text-purple-500 dark:text-purple-400 mt-1">
+                {stats.uniqueUsersThisMonth} уникальных пользователей
+              </p>
             </div>
-            <BarChart3 className="h-12 w-12 text-secondary-500 opacity-80" />
+            <Users className="h-12 w-12 text-purple-500 opacity-80" />
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-warning-50 to-warning-100 dark:from-warning-900/20 dark:to-warning-800/20 p-6 rounded-xl">
+        <div className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 p-6 rounded-xl">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-warning-600 dark:text-warning-400 mb-1">Всего</p>
-              <p className="text-3xl font-bold text-warning-700 dark:text-warning-300">{stats.totalThisMonth}</p>
-              <p className="text-xs text-warning-500 dark:text-warning-400 mt-1">уникальных пользователей</p>
+              <p className="text-sm text-orange-600 dark:text-orange-400 mb-1">Мероприятия</p>
+              <p className="text-3xl font-bold text-orange-700 dark:text-orange-300">{stats.eventAttendance}</p>
+              <p className="text-xs text-orange-500 dark:text-orange-400 mt-1">
+                vs {stats.generalAttendance} общих
+              </p>
             </div>
-            <Users className="h-12 w-12 text-warning-500 opacity-80" />
+            <BarChart3 className="h-12 w-12 text-orange-500 opacity-80" />
           </div>
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Filters and Search */}
       <div className="bg-white dark:bg-dark-800 rounded-lg shadow-md p-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-4">
+        <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+          <div className="flex flex-wrap gap-4 items-center">
             {/* Search */}
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Поиск по имени пользователя..."
+                placeholder="Поиск по имени..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10 pr-4 py-2 border border-gray-300 dark:border-dark-600 rounded-lg dark:bg-dark-700 w-64"
@@ -458,7 +470,7 @@ const AdminAttendance = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                         record.attendance_type === 'event'
-                          ? 'bg-primary-100 text-primary-800 dark:bg-primary-900/30 dark:text-primary-300'
+                          ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
                           : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
                       }`}>
                         {getAttendanceTypeLabel(record.attendance_type)}
