@@ -473,7 +473,7 @@ const AdminAbout: React.FC = () => {
           </div>
 
          {/* // src/pages/admin/AdminAbout.tsx - Часть 4: Блоки команды и контрибьюторов */}
-// src/pages/admin/AdminAbout.tsx - Часть 4: Блоки команды и контрибьюторов
+
 
           {/* Команда */}
           <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
@@ -513,7 +513,7 @@ const AdminAbout: React.FC = () => {
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => handleEditTeamMember(index)}
-                        className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                        className="p-1 text-gray-400 hover:text-primary-600 transition-colors"
                       >
                         <Edit className="w-3 h-3" />
                       </button>
@@ -617,7 +617,7 @@ const AdminAbout: React.FC = () => {
                             />
                             <button
                               onClick={() => handleEditContributor(index)}
-                              className="p-2 text-gray-400 hover:text-blue-600 transition-colors flex-shrink-0"
+                              className="p-2 text-gray-400 hover:text-primary-600 transition-colors flex-shrink-0"
                               title="Редактировать фото"
                             >
                               <ImageIcon className="w-4 h-4" />
@@ -640,9 +640,9 @@ const AdminAbout: React.FC = () => {
 
             {/* Форма добавления нового контрибьютора */}
             {showContributorForm ? (
-              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+              <div className="bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                  <h4 className="text-sm font-medium text-primary-900 dark:text-primary-100">
                     {editingContributorIndex !== null ? 'Редактировать контрибьютора' : 'Новый контрибьютор'}
                   </h4>
                   <button
@@ -651,7 +651,7 @@ const AdminAbout: React.FC = () => {
                       setEditContributor({ name: '', contribution: '', website: '' });
                       setEditingContributorIndex(null);
                     }}
-                    className="p-1 text-blue-400 hover:text-blue-600 transition-colors"
+                    className="p-1 text-primary-400 hover:text-primary-600 transition-colors"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -664,7 +664,7 @@ const AdminAbout: React.FC = () => {
                         type="text"
                         value={editContributor.name}
                         onChange={(e) => setEditContributor(prev => ({ ...prev, name: e.target.value }))}
-                        className="w-full p-2 text-sm border border-blue-200 dark:border-blue-700 rounded-lg bg-white dark:bg-blue-900/30 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        className="w-full p-2 text-sm border border-primary-200 dark:border-primary-700 rounded-lg bg-white dark:bg-primary-900/30 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
                         placeholder="Имя контрибьютора *"
                       />
                     </div>
@@ -674,7 +674,7 @@ const AdminAbout: React.FC = () => {
                         type="text"
                         value={editContributor.contribution || ''}
                         onChange={(e) => setEditContributor(prev => ({ ...prev, contribution: e.target.value }))}
-                        className="w-full p-2 text-sm border border-blue-200 dark:border-blue-700 rounded-lg bg-white dark:bg-blue-900/30 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        className="w-full p-2 text-sm border border-primary-200 dark:border-primary-700 rounded-lg bg-white dark:bg-primary-900/30 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
                         placeholder="Описание вклада"
                       />
                     </div>
@@ -684,7 +684,7 @@ const AdminAbout: React.FC = () => {
                         type="url"
                         value={editContributor.website || ''}
                         onChange={(e) => setEditContributor(prev => ({ ...prev, website: e.target.value }))}
-                        className="w-full p-2 text-sm border border-blue-200 dark:border-blue-700 rounded-lg bg-white dark:bg-blue-900/30 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        className="w-full p-2 text-sm border border-primary-200 dark:border-primary-700 rounded-lg bg-white dark:bg-primary-900/30 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
                         placeholder="https://example.com"
                       />
                     </div>
@@ -692,7 +692,7 @@ const AdminAbout: React.FC = () => {
                   
                   {/* Загрузка фото */}
                   <div>
-                    <label className="block text-xs font-medium text-blue-900 dark:text-blue-100 mb-2">
+                    <label className="block text-xs font-medium text-primary-900 dark:text-primary-100 mb-2">
                       Фото
                     </label>
                     <div className="flex items-center gap-3">
@@ -707,7 +707,7 @@ const AdminAbout: React.FC = () => {
                         type="file"
                         accept="image/*"
                         onChange={(e) => handleFileUpload(e, 'contributor')}
-                        className="flex-1 text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-blue-900/50 dark:file:text-blue-300"
+                        className="flex-1 text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 dark:file:bg-primary-900/50 dark:file:text-primary-300"
                       />
                     </div>
                   </div>
@@ -726,7 +726,7 @@ const AdminAbout: React.FC = () => {
                   </button>
                   <button
                     onClick={saveContributor}
-                    className="px-3 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                    className="px-3 py-2 text-sm bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
                   >
                     {editingContributorIndex !== null ? 'Обновить' : 'Добавить'}
                   </button>
@@ -746,9 +746,9 @@ const AdminAbout: React.FC = () => {
               </button>
             )}
           </div>
-
           
-         // src/pages/admin/AdminAbout.tsx - Часть 5: Платформы поддержки и модальные окна
+         {/* // src/pages/admin/AdminAbout.tsx - Часть 5: Платформы поддержки и модальные окна*/}
+        
 
           {/* Платформы поддержки */}
           <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
@@ -790,7 +790,7 @@ const AdminAbout: React.FC = () => {
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => handleEditPlatform(index)}
-                        className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                        className="p-1 text-gray-400 hover:text-primary-600 transition-colors"
                       >
                         <Edit className="w-3 h-3" />
                       </button>
