@@ -1,6 +1,21 @@
 // src/services/SimpleRegistrationService.ts
 import { supabase } from '../lib/supabase';
-import { SimpleRegistration, SimpleEvent, PaymentStatus, RegistrationStatus } from '../types/events';
+
+export interface SimpleRegistration {
+  id: string;
+  event_id: string;
+  user_id?: string;
+  full_name: string;
+  email: string;
+  phone: string;
+  tickets: number;
+  total_amount: number;
+  registration_status: 'active' | 'cancelled';
+  payment_status: 'free' | 'donation' | 'venue' | 'online_pending' | 'online_paid';
+  qr_code: string;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface CreateRegistrationData {
   eventId: string;
@@ -279,7 +294,7 @@ export class SimpleRegistrationService {
    */
   static async updatePaymentStatus(
     registrationId: string, 
-    paymentStatus: PaymentStatus
+    paymentStatus: 'free' | 'donation' | 'venue' | 'online_pending' | 'online_paid'
   ): Promise<boolean> {
     try {
       const { error } = await supabase
@@ -338,10 +353,14 @@ export class SimpleRegistrationService {
     tickets: number
   ): Promise<{ canRegister: boolean; reason?: string }> {
     try {
-      // Получаем информацию о событии
-      const event = await this.getEventWithRegistrations(eventId);
+      // Получаем информацию о событии из нового представления
+      const { data: event, error } = await supabase
+        .from('events_with_simple_registrations')
+        .select('registration_available, available_spots, registration_enabled, registration_deadline')
+        .eq('id', eventId)
+        .single();
       
-      if (!event) {
+      if (error || !event) {
         return { canRegister: false, reason: 'Событие не найдено' };
       }
 
@@ -457,6 +476,35 @@ export class SimpleRegistrationService {
     } catch (error) {
       console.error('Unexpected stats error:', error);
       return null;
+    }
+  }
+
+  /**
+   * Мигрирует старые регистрации в новую систему
+   */
+  static async migrateOldRegistrations(): Promise<{ success: boolean; message: string }> {
+    try {
+      const { error } = await supabase.rpc('migrate_old_registrations');
+
+      if (error) {
+        console.error('Migration error:', error);
+        return {
+          success: false,
+          message: `Ошибка миграции: ${error.message}`
+        };
+      }
+
+      return {
+        success: true,
+        message: 'Миграция успешно выполнена'
+      };
+
+    } catch (error) {
+      console.error('Unexpected migration error:', error);
+      return {
+        success: false,
+        message: 'Произошла неожиданная ошибка при миграции'
+      };
     }
   }
 
