@@ -1,33 +1,41 @@
-// src/pages/admin/CreateEditEventPage.tsx - Унифицированная версия
-import React, { useState, useEffect, useRef } from 'react';
+// src/pages/admin/CreateEditEventPage.tsx - Готовая часть 1
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { createClient } from '@supabase/supabase-js';
-import { 
-  Save, 
-  Loader2, 
-  Calendar,
-  Info, 
-  Upload, 
-  Trash2, 
-  AlertTriangle,
-  Eye,
-  ArrowLeft,
-  Users,
-  Clock,
-  MapPin,
-  DollarSign
-} from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { 
+  Info, Calendar, MapPin, Users, Globe, Save, Loader2, 
+  Upload, Image as ImageIcon, X, Trash2, AlertTriangle,
+  DollarSign, Tag, Plus
+} from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 import EventSpeakersSection from '../../components/admin/EventSpeakersSection';
 import EventFestivalProgramSection from '../../components/admin/EventFestivalProgramSection';
 
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-);
+// Константы
+const TITLE_MAX_LENGTH = 100;
+const SHORT_DESC_MAX_LENGTH = 150;
+const DESC_MAX_LENGTH = 2000;
 
-// === ТИПЫ ===
+// Типы
+interface FestivalProgramItem {
+  title: string;
+  description: string;
+  image_url: string;
+  start_time: string;
+  end_time: string;
+  lecturer_id: string;
+}
+
+interface Speaker {
+  id: string;
+  name: string;
+  field_of_expertise: string;
+  description: string;
+  photos: { url: string; isMain?: boolean }[];
+}
+
 interface CreateEventForm {
+  id?: string;
   title: string;
   short_description: string;
   description: string;
@@ -49,26 +57,21 @@ interface CreateEventForm {
   child_half_price: boolean;
   languages: string[];
   speakers: string[];
-  festival_program: any[];
+  festival_program: FestivalProgramItem[];
   video_url: string;
   photo_gallery: string[];
   couple_discount: string;
   hide_speakers_gallery: boolean;
+  original_bg_image?: string | null;
 }
 
-interface Speaker {
-  id: string;
-  name: string;
-  field_of_expertise: string;
-  photos: any[];
-}
-
-// === КОНСТАНТЫ ===
+// Опции для выбора
 const eventTypes = [
   'lecture', 'workshop', 'conference', 'seminar', 'meetup', 'webinar',
   'training', 'course', 'festival', 'exhibition', 'discussion', 'other'
 ];
 
+// Правильные возрастные категории
 const ageCategories = [
   { value: '0+', label: '0+ (для всех)' },
   { value: '6+', label: '6+ (от 6 лет)' },
@@ -77,21 +80,11 @@ const ageCategories = [
   { value: '18+', label: '18+ (только взрослые)' }
 ];
 
-const paymentTypes = [
-  { value: 'free', label: 'Бесплатное' },
-  { value: 'cost', label: 'Платное' },
-  { value: 'donation', label: 'По донации' }
-];
-
-const statuses = [
-  { value: 'draft', label: 'Черновик' },
-  { value: 'active', label: 'Активное' },
-  { value: 'past', label: 'Прошедшее' }
-];
-
+const paymentTypes = ['free', 'cost', 'donation'];
+const statuses = ['draft', 'active', 'past'];
 const availableLanguages = ['Русский', 'Английский', 'Сербский', 'Испанский', 'Французский'];
 
-// === ФУНКЦИИ УТИЛИТЫ ===
+// Функция создания начального состояния
 const createInitialEventState = (): CreateEventForm => ({
   title: '',
   short_description: '',
@@ -121,6 +114,7 @@ const createInitialEventState = (): CreateEventForm => ({
   hide_speakers_gallery: false
 });
 
+// Функции утилиты
 const formatDateTimeForInput = (timestamp: string): string => {
   if (!timestamp) return '';
   
@@ -134,22 +128,38 @@ const formatDateTimeForInput = (timestamp: string): string => {
   }
 };
 
-// === ОСНОВНОЙ КОМПОНЕНТ ===
-const CreateEditEventPage: React.FC = () => {
+const getImageUrl = (imagePath: string): string => {
+  if (!imagePath) return '';
+  
+  if (imagePath.startsWith('http')) {
+    return imagePath;
+  }
+  
+  const { data } = supabase.storage
+    .from('images')
+    .getPublicUrl(imagePath);
+    
+  return data.publicUrl;
+};
+
+
+// src/pages/admin/CreateEditEventPage.tsx - Готовая часть 2
+const CreateEditEventPage = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Состояния
+  // State
   const [event, setEvent] = useState<CreateEventForm>(createInitialEventState());
   const [speakers, setSpeakers] = useState<Speaker[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [errors, setErrors] = useState<Record<string, boolean>>({});
 
-  // === ЗАГРУЗКА ДАННЫХ ===
+  // Загрузка данных при монтировании
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
@@ -177,11 +187,11 @@ const CreateEditEventPage: React.FC = () => {
             setEvent({
               ...eventData,
               price: eventData.price?.toString() || '',
-              couple_discount: eventData.couple_discount?.toString() || '',
-              start_at: formatDateTimeForInput(eventData.start_at) || '',
-              end_at: formatDateTimeForInput(eventData.end_at) || '',
-              short_description: eventData.short_description || '',
               price_comment: eventData.price_comment || '',
+              couple_discount: eventData.couple_discount?.toString() || '',
+              start_at: eventData.start_at || '',
+              end_at: eventData.end_at || '',
+              short_description: eventData.short_description || '',
               child_half_price: eventData.child_half_price || false,
               languages: eventData.languages || [],
               speakers: eventData.speakers || [],
@@ -191,7 +201,9 @@ const CreateEditEventPage: React.FC = () => {
                 : [],
               oblakkarte_data_event_id: eventData.oblakkarte_data_event_id || '',
               widget_chooser: eventData.widget_chooser || false,
-              hide_speakers_gallery: eventData.hide_speakers_gallery || false
+              max_registrations: eventData.registrations?.max_regs || 
+                               eventData.max_registrations || 40,
+              original_bg_image: eventData.bg_image
             });
           }
         }
@@ -206,80 +218,117 @@ const CreateEditEventPage: React.FC = () => {
     loadData();
   }, [id]);
 
-  // === ОБРАБОТЧИКИ ===
+  // Обработчики
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value, type } = e.target;
+    const { name, value } = e.target;
     
-    if (type === 'checkbox') {
-      const { checked } = e.target as HTMLInputElement;
-      setEvent(prev => ({ ...prev, [name]: checked }));
-    } else {
-      setEvent(prev => ({ ...prev, [name]: value }));
-    }
+    if (name === 'title' && value && value.length > TITLE_MAX_LENGTH) return;
+    if (name === 'short_description' && value && value.length > SHORT_DESC_MAX_LENGTH) return;
+    if (name === 'description' && value && value.length > DESC_MAX_LENGTH) return;
     
-    // Очистка ошибки при изменении поля
-    if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: false }));
+    setEvent(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    
+    if (name in errors) {
+      setErrors(prev => ({
+        ...prev,
+        [name]: false
+      }));
     }
   };
 
-  const handleLanguageChange = (language: string) => {
+  const handleDateTimeChange = (field: 'start_at' | 'end_at', value: string) => {
+    if (!value) return;
+    
+    const timestamp = new Date(value).toISOString();
+    
     setEvent(prev => ({
       ...prev,
-      languages: prev.languages.includes(language)
-        ? prev.languages.filter(l => l !== language)
-        : [...prev.languages, language]
+      [field]: timestamp
     }));
+    
+    setErrors(prev => ({
+      ...prev,
+      [field]: false
+    }));
+  };
+
+  const handleLanguageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { value, checked } = e.target;
+    
+    if (checked) {
+      setEvent(prev => ({
+        ...prev,
+        languages: [...prev.languages, value]
+      }));
+    } else {
+      setEvent(prev => ({
+        ...prev,
+        languages: prev.languages.filter(lang => lang !== value)
+      }));
+    }
   };
 
   const handleSpeakerToggle = (speakerId: string) => {
+    setEvent(prev => {
+      const speakers = [...prev.speakers];
+      
+      if (speakers.includes(speakerId)) {
+        return {
+          ...prev,
+          speakers: speakers.filter(id => id !== speakerId)
+        };
+      } else {
+        return {
+          ...prev,
+          speakers: [...speakers, speakerId]
+        };
+      }
+    });
+  };
+
+  const handleHideSpeakersGalleryChange = (hide: boolean) => {
     setEvent(prev => ({
       ...prev,
-      speakers: prev.speakers.includes(speakerId)
-        ? prev.speakers.filter(id => id !== speakerId)
-        : [...prev.speakers, speakerId]
+      hide_speakers_gallery: hide
     }));
   };
 
-  const handleFestivalProgramChange = (program: any[]) => {
-    setEvent(prev => ({ ...prev, festival_program: program }));
+  const handleFestivalProgramChange = (program: FestivalProgramItem[]) => {
+    setEvent(prev => ({
+      ...prev,
+      festival_program: program
+    }));
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      setIsUploading(true);
-      const timestamp = Date.now();
-      const fileExt = file.name.split('.').pop();
-      const fileName = `event_${timestamp}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('images')
-        .upload(fileName, file);
-
-      if (uploadError) throw uploadError;
-
-      setEvent(prev => ({ ...prev, bg_image: fileName }));
-      toast.success('Изображение загружено');
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      toast.error('Ошибка при загрузке изображения');
-    } finally {
-      setIsUploading(false);
-    }
+  const handlePhotoGalleryChange = (photos: string[]) => {
+    setEvent(prev => ({
+      ...prev,
+      photo_gallery: Array.isArray(photos) ? photos : []
+    }));
   };
 
-  // === ВАЛИДАЦИЯ ===
+  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, checked } = e.target;
+    setEvent(prev => ({
+      ...prev,
+      [name]: checked
+    }));
+  };
+
+  // src/pages/admin/CreateEditEventPage.tsx - Готовая часть 3
+
+  // Валидация формы
   const validateForm = (): boolean => {
     const newErrors: Record<string, boolean> = {};
 
-    if (!event.title?.trim()) newErrors.title = true;
-    if (!event.description?.trim()) newErrors.description = true;
+    if (!event.title || !event.title.trim()) newErrors.title = true;
+    if (!event.description || !event.description.trim()) newErrors.description = true;
     if (!event.start_at) newErrors.start_at = true;
     if (!event.end_at) newErrors.end_at = true;
-    if (!event.location?.trim()) newErrors.location = true;
+    if (!event.location || !event.location.trim()) newErrors.location = true;
 
     // Проверка времени
     if (event.start_at && event.end_at) {
@@ -292,28 +341,151 @@ const CreateEditEventPage: React.FC = () => {
       }
     }
 
-    // Валидация оплаты
-    if (event.payment_type === 'cost') {
-      if (!event.price || parseFloat(event.price) <= 0) {
-        newErrors.price = true;
-      }
-      
-      if (event.widget_chooser) {
-        if (!event.oblakkarte_data_event_id?.trim()) {
-          newErrors.oblakkarte_data_event_id = true;
+    // Валидация полей оплаты
+    if (event.status === 'active') {
+      if (event.payment_type === 'cost') {
+        if (!event.price || parseFloat(event.price) <= 0) {
+          newErrors.price = true;
+          toast.error('Для платных мероприятий необходимо указать цену');
         }
-      } else {
-        if (!event.payment_link?.trim()) {
-          newErrors.payment_link = true;
+        
+        // Проверяем настройки онлайн оплаты
+        if (event.widget_chooser) {
+          // Для виджета нужен ID события
+          if (!event.oblakkarte_data_event_id?.trim()) {
+            newErrors.oblakkarte_data_event_id = true;
+            toast.error('Для виджета оплаты необходимо указать ID события Oblakkarte');
+          }
+        } else {
+          // Для ссылки нужна ссылка на оплату
+          if (!event.payment_link?.trim()) {
+            newErrors.payment_link = true;
+            toast.error('Для ссылки на оплату необходимо указать URL');
+          }
         }
       }
+    }
+
+    // Валидация количества участников
+    if (event.max_registrations && event.max_registrations < 1) {
+      newErrors.max_registrations = true;
+      toast.error('Количество участников должно быть больше 0');
     }
 
     setErrors(newErrors);
     return !Object.values(newErrors).some(Boolean);
   };
 
-  // === СОХРАНЕНИЕ ===
+  // Загрузка файла изображения
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    try {
+      setIsUploading(true);
+      setUploadProgress(0);
+      
+      const timestamp = Date.now();
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${timestamp}.${fileExt}`;
+      const filePath = `events/${fileName}`;
+      
+      const { data, error } = await supabase.storage
+        .from('images')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false,
+          onUploadProgress: (progress) => {
+            const percent = Math.round((progress.loaded / progress.total) * 100);
+            setUploadProgress(percent);
+          }
+        });
+      
+      if (error) throw error;
+      
+      setEvent(prev => ({
+        ...prev,
+        bg_image: filePath,
+        original_bg_image: prev.bg_image || null
+      }));
+      
+      toast.success('Изображение успешно загружено');
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      toast.error('Ошибка при загрузке файла');
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(0);
+      
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  // Подготовка данных для отправки
+  const prepareEventData = () => {
+    const eventData = {
+      ...event,
+      price: event.price ? parseFloat(event.price) : null,
+      couple_discount: event.couple_discount ? parseFloat(event.couple_discount) : null,
+      photo_gallery: Array.isArray(event.photo_gallery) ? event.photo_gallery : [],
+      
+      // Настраиваем регистрации
+      registrations: {
+        max_regs: event.max_registrations || 40,
+        current: 0,
+        current_adults: 0,
+        current_children: 0,
+        reg_list: []
+      },
+      
+      // Удаляем неиспользуемые поля
+      payment_widget_id: undefined, // Устаревшее поле
+      
+      // Удаляем legacy поля
+      date: undefined,
+      start_time: undefined,
+      end_time: undefined,
+      original_bg_image: undefined
+    };
+    
+    // Очищаем поля в зависимости от типа оплаты
+    if (eventData.payment_type === 'free') {
+      eventData.price = null;
+      eventData.payment_link = null;
+      eventData.oblakkarte_data_event_id = null;
+      eventData.widget_chooser = false;
+      eventData.child_half_price = false;
+    } else if (eventData.payment_type === 'cost') {
+      if (!eventData.widget_chooser) {
+        // Для ссылки очищаем ID события
+        eventData.oblakkarte_data_event_id = null;
+      } else {
+        // Для виджета очищаем ссылку
+        eventData.payment_link = null;
+      }
+      
+      // Для мероприятий 18+ убираем детскую скидку
+      if (eventData.age_category === '18+') {
+        eventData.child_half_price = false;
+      }
+    }
+    
+    // Удаляем undefined значения
+    Object.keys(eventData).forEach(key => {
+      if (eventData[key] === undefined) {
+        delete eventData[key];
+      }
+    });
+    
+    return eventData;
+  };
+
+  
+  // src/pages/admin/CreateEditEventPage.tsx - Готовая часть 4
+
+  // Отправка формы
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -325,29 +497,7 @@ const CreateEditEventPage: React.FC = () => {
     try {
       setSaving(true);
       
-      // Подготовка данных
-      const eventData = {
-        ...event,
-        price: event.payment_type === 'cost' && event.price ? parseFloat(event.price) : null,
-        couple_discount: event.couple_discount ? parseFloat(event.couple_discount) : null,
-        registrations: {
-          max_regs: event.max_registrations || 40,
-          current: 0,
-          current_adults: 0,
-          current_children: 0,
-          reg_list: []
-        }
-      };
-
-      // Очистка полей в зависимости от типа оплаты
-      if (eventData.payment_type === 'free') {
-        eventData.price = null;
-        eventData.payment_link = null;
-        eventData.oblakkarte_data_event_id = null;
-        eventData.widget_chooser = false;
-        eventData.child_half_price = false;
-      }
-
+      const eventData = prepareEventData();
       const isNew = !id;
       
       const response = await fetch(
@@ -358,12 +508,21 @@ const CreateEditEventPage: React.FC = () => {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
           },
-          body: JSON.stringify({ eventData, isNew })
+          body: JSON.stringify({
+            eventData,
+            isNew
+          })
         }
       );
       
+      const result = await response.json();
+      
       if (!response.ok) {
-        throw new Error('Ошибка сохранения');
+        if (result.code === 'PG_NET_EXTENSION_MISSING') {
+          console.warn('Database notification extension (pg_net) is not enabled. Notifications will not be sent.');
+        } else {
+          throw new Error(result.error || 'Error saving event');
+        }
       }
       
       toast.success(isNew ? 'Мероприятие создано!' : 'Мероприятие обновлено!');
@@ -377,7 +536,7 @@ const CreateEditEventPage: React.FC = () => {
     }
   };
 
-  // === УДАЛЕНИЕ ===
+  // Удаление мероприятия
   const handleDelete = async () => {
     if (!id) return;
     
@@ -399,8 +558,10 @@ const CreateEditEventPage: React.FC = () => {
         }
       );
       
+      const result = await response.json();
+      
       if (!response.ok) {
-        throw new Error('Ошибка удаления');
+        throw new Error(result.error || 'Error deleting event');
       }
       
       toast.success('Мероприятие удалено');
@@ -414,554 +575,822 @@ const CreateEditEventPage: React.FC = () => {
     }
   };
 
-  // === СОСТОЯНИЕ ЗАГРУЗКИ ===
+  // Отображение загрузки
   if (loading) {
     return (
-      <div className="flex justify-center items-center py-12">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-300">Загрузка...</p>
-        </div>
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
       </div>
     );
   }
 
-  // === РЕНДЕР ===
+  // Основной JSX - начало
   return (
-    <div className="space-y-6">
-      {/* Унифицированный заголовок */}
-      <div className="bg-white dark:bg-dark-800 rounded-xl shadow-sm border border-gray-200 dark:border-dark-700">
-        <div className="p-6 border-b border-gray-200 dark:border-dark-700">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary-100 dark:bg-primary-900/30 rounded-lg text-primary-600 dark:text-primary-400">
-                <Calendar className="w-5 h-5" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {id ? 'Редактирование мероприятия' : 'Создание мероприятия'}
-                </h1>
-                <p className="text-gray-600 dark:text-gray-300 text-sm mt-1">
-                  {id ? 'Обновите информацию о мероприятии' : 'Заполните детали нового мероприятия'}
-                </p>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => navigate('/admin/events')}
-                className="flex items-center gap-2 px-3 py-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors text-sm"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Назад
-              </button>
-              
-              {id && (
-                <button
-                  onClick={() => setShowDeleteConfirm(true)}
-                  className="flex items-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Удалить
-                </button>
-              )}
-              
-              <button
-                onClick={handleSubmit}
-                disabled={saving}
-                className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {saving ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Сохранение...
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4" />
-                    Сохранить
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
+    <div className="max-w-5xl mx-auto px-4 py-6">
+      {/* Заголовок */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
+          {id ? 'Редактирование мероприятия' : 'Создание мероприятия'}
+        </h1>
+        
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+          {id && (
+            <button
+              type="button"
+              onClick={() => setShowDeleteConfirm(true)}
+              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg flex items-center justify-center gap-2 transition-colors"
+            >
+              <Trash2 className="h-5 w-5" />
+              Удалить
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={saving}
+            className="px-6 py-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white rounded-lg flex items-center justify-center gap-2 transition-colors"
+          >
+            {saving ? (
+              <>
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Сохранение...
+              </>
+            ) : (
+              <>
+                <Save className="h-5 w-5" />
+                Сохранить
+              </>
+            )}
+          </button>
         </div>
+      </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Основная информация */}
-          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-4">
-              <Info className="w-5 h-5 text-gray-500" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Основная информация</h3>
+      {/* Статус мероприятия */}
+      <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-dark-600 p-6 mb-6">
+        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+          <Tag className="h-5 w-5 text-primary-600" />
+          Статус мероприятия
+        </h2>
+        
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {statuses.map(status => (
+            <button
+              key={status}
+              type="button"
+              onClick={() => setEvent(prev => ({ ...prev, status }))}
+              className={`p-4 rounded-xl border-2 text-center transition-all duration-200 ${
+                event.status === status
+                  ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
+                  : 'border-gray-200 dark:border-dark-600 bg-gray-50 dark:bg-dark-700 text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-dark-500'
+              }`}
+            >
+              <div className="font-semibold text-lg mb-1">
+                {status === 'active' ? '🟢 Активное' : 
+                 status === 'draft' ? '📝 Черновик' : 
+                 '⏹️ Прошедшее'}
+              </div>
+              <div className="text-sm opacity-75">
+                {status === 'active' ? 'Видно пользователям' : 
+                 status === 'draft' ? 'Скрыто от пользователей' : 
+                 'Архивное событие'}
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+{/* // src/pages/admin/CreateEditEventPage.tsx - Готовая часть 5 */}
+
+
+      {/* Основная форма */}
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Основная информация */}
+        <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-dark-600 p-6">
+          <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
+            <Info className="h-5 w-5 text-primary-600" />
+            Основная информация
+          </h2>
+          
+          <div className="space-y-6">
+            {/* Название */}
+            <div className="form-group">
+              <label htmlFor="title" className="block font-medium mb-2 text-gray-700 dark:text-gray-300">
+                Название мероприятия <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                id="title"
+                name="title"
+                value={event.title}
+                onChange={handleInputChange}
+                className={`w-full px-4 py-3 rounded-lg border transition-colors ${
+                  errors.title 
+                    ? 'border-red-500 focus:border-red-500' 
+                    : 'border-gray-300 dark:border-dark-600 focus:border-primary-500'
+                } bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800`}
+                placeholder="Введите название мероприятия"
+              />
+              <p className="text-gray-500 text-sm text-right mt-2">
+                {(event.title || '').length}/{TITLE_MAX_LENGTH}
+              </p>
             </div>
             
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Название */}
-              <div className="lg:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Название мероприятия *
-                </label>
-                <input
-                  type="text"
-                  name="title"
-                  value={event.title}
-                  onChange={handleInputChange}
-                  className={`w-full p-3 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all ${
-                    errors.title ? 'border-red-500' : 'border-gray-200 dark:border-gray-600'
-                  }`}
-                  placeholder="Введите название мероприятия"
-                />
-              </div>
-
-              {/* Тип мероприятия */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            {/* Краткое описание */}
+            <div className="form-group">
+              <label htmlFor="short_description" className="block font-medium mb-2 text-gray-700 dark:text-gray-300">
+                Краткое описание
+              </label>
+              <input
+                type="text"
+                id="short_description"
+                name="short_description"
+                value={event.short_description || ''}
+                onChange={handleInputChange}
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-dark-600 bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800 transition-colors"
+                placeholder="Краткое описание для списка мероприятий"
+              />
+              <p className="text-gray-500 text-sm text-right mt-2">
+                {(event.short_description || '').length}/{SHORT_DESC_MAX_LENGTH}
+              </p>
+            </div>
+            
+            {/* Описание */}
+            <div className="form-group">
+              <label htmlFor="description" className="block font-medium mb-2 text-gray-700 dark:text-gray-300">
+                Полное описание <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                id="description"
+                name="description"
+                value={event.description || ''}
+                onChange={handleInputChange}
+                rows={6}
+                className={`w-full px-4 py-3 rounded-lg border transition-colors ${
+                  errors.description 
+                    ? 'border-red-500 focus:border-red-500' 
+                    : 'border-gray-300 dark:border-dark-600 focus:border-primary-500'
+                } bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800 resize-vertical`}
+                placeholder="Подробное описание мероприятия"
+              />
+              <p className="text-gray-500 text-sm text-right mt-2">
+                {(event.description || '').length}/{DESC_MAX_LENGTH}
+              </p>
+            </div>
+            
+            {/* Тип мероприятия и возрастная категория */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="form-group">
+                <label htmlFor="event_type" className="block font-medium mb-2 text-gray-700 dark:text-gray-300">
                   Тип мероприятия
                 </label>
                 <select
+                  id="event_type"
                   name="event_type"
                   value={event.event_type}
                   onChange={handleInputChange}
-                  className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-dark-600 bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800"
                 >
                   {eventTypes.map(type => (
-                    <option key={type} value={type}>{type}</option>
+                    <option key={type} value={type}>
+                      {type === 'lecture' ? 'Лекция' :
+                       type === 'workshop' ? 'Воркшоп' :
+                       type === 'conference' ? 'Конференция' :
+                       type === 'seminar' ? 'Семинар' :
+                       type === 'meetup' ? 'Митап' :
+                       type === 'webinar' ? 'Вебинар' :
+                       type === 'training' ? 'Тренинг' :
+                       type === 'course' ? 'Курс' :
+                       type === 'festival' ? 'Фестиваль' :
+                       type === 'exhibition' ? 'Выставка' :
+                       type === 'discussion' ? 'Дискуссия' :
+                       'Другое'}
+                    </option>
                   ))}
                 </select>
               </div>
-
-              {/* Возрастная категория */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              
+              <div className="form-group">
+                <label htmlFor="age_category" className="block font-medium mb-2 text-gray-700 dark:text-gray-300">
                   Возрастная категория
                 </label>
                 <select
+                  id="age_category"
                   name="age_category"
                   value={event.age_category}
                   onChange={handleInputChange}
-                  className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-dark-600 bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800"
                 >
                   {ageCategories.map(category => (
-                    <option key={category.value} value={category.value}>{category.label}</option>
+                    <option key={category.value} value={category.value}>
+                      {category.label}
+                    </option>
                   ))}
                 </select>
               </div>
-
-              {/* Статус */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Статус
-                </label>
-                <select
-                  name="status"
-                  value={event.status}
-                  onChange={handleInputChange}
-                  className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
-                >
-                  {statuses.map(status => (
-                    <option key={status.value} value={status.value}>{status.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Краткое описание */}
-              <div className="lg:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Краткое описание
-                </label>
-                <textarea
-                  name="short_description"
-                  value={event.short_description}
-                  onChange={handleInputChange}
-                  rows={3}
-                  className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all resize-none"
-                  placeholder="Краткое описание для превью"
-                />
-              </div>
-
-              {/* Полное описание */}
-              <div className="lg:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Полное описание *
-                </label>
-                <textarea
-                  name="description"
-                  value={event.description}
-                  onChange={handleInputChange}
-                  rows={6}
-                  className={`w-full p-3 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all resize-none ${
-                    errors.description ? 'border-red-500' : 'border-gray-200 dark:border-gray-600'
-                  }`}
-                  placeholder="Подробное описание мероприятия"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Время и место */}
-          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-4">
-              <Clock className="w-5 h-5 text-gray-500" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Время и место</h3>
             </div>
             
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Начало */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Время начала *
-                </label>
-                <input
-                  type="datetime-local"
-                  name="start_at"
-                  value={event.start_at}
-                  onChange={handleInputChange}
-                  className={`w-full p-3 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all ${
-                    errors.start_at ? 'border-red-500' : 'border-gray-200 dark:border-gray-600'
-                  }`}
-                />
-              </div>
-
-              {/* Окончание */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Время окончания *
-                </label>
-                <input
-                  type="datetime-local"
-                  name="end_at"
-                  value={event.end_at}
-                  onChange={handleInputChange}
-                  className={`w-full p-3 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all ${
-                    errors.end_at ? 'border-red-500' : 'border-gray-200 dark:border-gray-600'
-                  }`}
-                />
-              </div>
-
-              {/* Место проведения */}
-              <div className="lg:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Место проведения *
-                </label>
-                <input
-                  type="text"
-                  name="location"
-                  value={event.location}
-                  onChange={handleInputChange}
-                  className={`w-full p-3 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all ${
-                    errors.location ? 'border-red-500' : 'border-gray-200 dark:border-gray-600'
-                  }`}
-                  placeholder="Адрес или название места"
-                />
-              </div>
-
-              {/* Максимальное количество участников */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Максимум участников
-                </label>
-                <input
-                  type="number"
-                  name="max_registrations"
-                  value={event.max_registrations}
-                  onChange={handleInputChange}
-                  min="1"
-                  className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Оплата */}
-          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-4">
-              <DollarSign className="w-5 h-5 text-gray-500" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Настройки оплаты</h3>
+            {/* Локация */}
+            <div className="form-group">
+              <label htmlFor="location" className="block font-medium mb-2 text-gray-700 dark:text-gray-300">
+                Место проведения <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                id="location"
+                name="location"
+                value={event.location}
+                onChange={handleInputChange}
+                className={`w-full px-4 py-3 rounded-lg border transition-colors ${
+                  errors.location 
+                    ? 'border-red-500 focus:border-red-500' 
+                    : 'border-gray-300 dark:border-dark-600 focus:border-primary-500'
+                } bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800`}
+                placeholder="Адрес или название места"
+              />
             </div>
             
-            <div className="space-y-4">
-              {/* Тип оплаты */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Тип оплаты
-                </label>
-                <select
-                  name="payment_type"
-                  value={event.payment_type}
-                  onChange={handleInputChange}
-                  className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
-                >
-                  {paymentTypes.map(type => (
-                    <option key={type.value} value={type.value}>{type.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Поля для платного мероприятия */}
-              {event.payment_type === 'cost' && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Цена *
-                    </label>
-                    <input
-                      type="number"
-                      name="price"
-                      value={event.price}
-                      onChange={handleInputChange}
-                      step="0.01"
-                      min="0"
-                      className={`w-full p-3 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all ${
-                        errors.price ? 'border-red-500' : 'border-gray-200 dark:border-gray-600'
-                      }`}
-                      placeholder="0.00"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Парная скидка
-                    </label>
-                    <input
-                      type="number"
-                      name="couple_discount"
-                      value={event.couple_discount}
-                      onChange={handleInputChange}
-                      step="0.01"
-                      min="0"
-                      className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
-                      placeholder="0.00"
-                    />
-                  </div>
-
-                  <div className="lg:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Комментарий к цене
-                    </label>
-                    <input
-                      type="text"
-                      name="price_comment"
-                      value={event.price_comment}
-                      onChange={handleInputChange}
-                      className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
-                      placeholder="Дополнительная информация о цене"
-                    />
-                  </div>
-
-                  {/* Настройки онлайн оплаты */}
-                  <div className="lg:col-span-2">
-                    <div className="flex items-center mb-3">
-                      <input
-                        type="checkbox"
-                        name="widget_chooser"
-                        checked={event.widget_chooser}
-                        onChange={handleInputChange}
-                        className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500"
-                      />
-                      <label className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Использовать виджет Oblakkarte (вместо ссылки)
-                      </label>
-                    </div>
-
-                    {event.widget_chooser ? (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          ID события Oblakkarte *
-                        </label>
-                        <input
-                          type="text"
-                          name="oblakkarte_data_event_id"
-                          value={event.oblakkarte_data_event_id}
-                          onChange={handleInputChange}
-                          className={`w-full p-3 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all ${
-                            errors.oblakkarte_data_event_id ? 'border-red-500' : 'border-gray-200 dark:border-gray-600'
-                          }`}
-                          placeholder="Например: DoYnhURt"
-                        />
-                      </div>
-                    ) : (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Ссылка на оплату *
-                        </label>
-                        <input
-                          type="url"
-                          name="payment_link"
-                          value={event.payment_link}
-                          onChange={handleInputChange}
-                          className={`w-full p-3 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all ${
-                            errors.payment_link ? 'border-red-500' : 'border-gray-200 dark:border-gray-600'
-                          }`}
-                          placeholder="https://..."
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Детская скидка */}
-                  {event.age_category !== '18+' && (
-                    <div className="lg:col-span-2">
-                      <div className="flex items-center">
-                        <input
-                          type="checkbox"
-                          name="child_half_price"
-                          checked={event.child_half_price}
-                          onChange={handleInputChange}
-                          className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500"
-                        />
-                        <label className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-                          Детская скидка 50%
-                        </label>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Изображение */}
-          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-4">
-              <Upload className="w-5 h-5 text-gray-500" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Изображение мероприятия</h3>
-            </div>
-
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileUpload}
-              accept="image/*"
-              className="hidden"
-            />
-            
-            {event.bg_image ? (
-              <div className="relative">
-                <img
-                  src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/images/${event.bg_image}`}
-                  alt="Event background"
-                  className="w-full h-48 object-cover rounded-lg border border-gray-200 dark:border-gray-600"
-                />
-                <button
-                  type="button"
-                  onClick={() => setEvent(prev => ({ ...prev, bg_image: '' }))}
-                  className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full opacity-80 hover:opacity-100 transition-opacity"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading}
-                className="w-full h-48 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-primary-400 dark:hover:border-primary-500 transition-colors bg-white dark:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex flex-col items-center justify-center"
-              >
-                {isUploading ? (
-                  <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
-                ) : (
-                  <>
-                    <Upload className="w-8 h-8 text-gray-400 mb-2" />
-                    <span className="text-sm text-gray-500 dark:text-gray-400">
-                      Нажмите для загрузки изображения
-                    </span>
-                  </>
-                )}
-              </button>
-            )}
-          </div>
-
-          {/* Языки */}
-          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-4">
-              <Users className="w-5 h-5 text-gray-500" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Языки мероприятия</h3>
-            </div>
-            
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-              {availableLanguages.map(language => (
-                <label key={language} className="flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={event.languages.includes(language)}
-                    onChange={() => handleLanguageChange(language)}
-                    className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500 mr-2"
-                  />
-                  <span className="text-sm text-gray-700 dark:text-gray-300">{language}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {/* Спикеры */}
-          <EventSpeakersSection
-            selectedSpeakerIds={event.speakers}
-            hideSpeakersGallery={event.hide_speakers_gallery}
-            onSpeakerToggle={handleSpeakerToggle}
-            onHideGalleryChange={(hidden) => setEvent(prev => ({ ...prev, hide_speakers_gallery: hidden }))}
-            allSpeakers={speakers}
-          />
-
-          {/* Программа фестиваля */}
-          {event.event_type === 'festival' && (
-            <EventFestivalProgramSection
-              eventType={event.event_type}
-              festivalProgram={event.festival_program}
-              allSpeakers={speakers}
-              onFestivalProgramChange={handleFestivalProgramChange}
-            />
-          )}
-
-          {/* Дополнительно */}
-          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-4">
-              <Eye className="w-5 h-5 text-gray-500" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Дополнительные настройки</h3>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            {/* Видео URL */}
+            <div className="form-group">
+              <label htmlFor="video_url" className="block font-medium mb-2 text-gray-700 dark:text-gray-300">
                 Ссылка на видео (YouTube, Vimeo)
               </label>
               <input
                 type="url"
+                id="video_url"
                 name="video_url"
                 value={event.video_url}
                 onChange={handleInputChange}
-                className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-dark-600 bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800"
                 placeholder="https://youtube.com/watch?v=..."
               />
             </div>
           </div>
-        </form>
-      </div>
+        </div>
+
+        {/* Дата и время */}
+        <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-dark-600 p-6">
+          <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
+            <Calendar className="h-5 w-5 text-primary-600" />
+            Дата и время
+          </h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="form-group">
+              <label htmlFor="start_at" className="block font-medium mb-2 text-gray-700 dark:text-gray-300">
+                Начало мероприятия <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="datetime-local"
+                id="start_at"
+                value={formatDateTimeForInput(event.start_at)}
+                onChange={(e) => handleDateTimeChange('start_at', e.target.value)}
+                className={`w-full px-4 py-3 rounded-lg border transition-colors ${
+                  errors.start_at 
+                    ? 'border-red-500 focus:border-red-500' 
+                    : 'border-gray-300 dark:border-dark-600 focus:border-primary-500'
+                } bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800`}
+              />
+            </div>
+            
+            <div className="form-group">
+              <label htmlFor="end_at" className="block font-medium mb-2 text-gray-700 dark:text-gray-300">
+                Окончание мероприятия <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="datetime-local"
+                id="end_at"
+                value={formatDateTimeForInput(event.end_at)}
+                onChange={(e) => handleDateTimeChange('end_at', e.target.value)}
+                className={`w-full px-4 py-3 rounded-lg border transition-colors ${
+                  errors.end_at 
+                    ? 'border-red-500 focus:border-red-500' 
+                    : 'border-gray-300 dark:border-dark-600 focus:border-primary-500'
+                } bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800`}
+              />
+            </div>
+          </div>
+        </div>
+
+
+{/* // src/pages/admin/CreateEditEventPage.tsx - Готовая часть 6 */}
+
+        {/* Обложка мероприятия */}
+        <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-dark-600 p-6">
+          <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
+            <ImageIcon className="h-5 w-5 text-primary-600" />
+            Обложка мероприятия
+          </h2>
+          
+          <div className="space-y-4">
+            {event.bg_image && (
+              <div className="relative inline-block">
+                <img
+                  src={getImageUrl(event.bg_image)}
+                  alt="Обложка мероприятия"
+                  className="w-full max-w-md h-48 object-cover rounded-lg"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = 'https://via.placeholder.com/400x200?text=Image+not+found';
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setEvent(prev => ({ ...prev, bg_image: '' }))}
+                  className="absolute top-2 right-2 p-1 bg-red-600 text-white rounded-full hover:bg-red-700 transition-colors"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+            
+            <div className="flex items-center gap-4">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white rounded-lg transition-colors"
+              >
+                <Upload className="h-5 w-5" />
+                {isUploading ? 'Загрузка...' : 'Загрузить изображение'}
+              </button>
+              
+              {isUploading && (
+                <div className="flex-1 bg-gray-200 dark:bg-dark-700 rounded-full h-2">
+                  <div
+                    className="bg-primary-600 h-2 rounded-full transition-all"
+                    style={{ width: `${uploadProgress}%` }}
+                  ></div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Языки */}
+        <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-dark-600 p-6">
+          <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
+            <Globe className="h-5 w-5 text-primary-600" />
+            Языки проведения
+          </h2>
+          
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+            {availableLanguages.map(language => (
+              <label
+                key={language}
+                className="flex items-center gap-2 p-3 border border-gray-300 dark:border-dark-600 rounded-lg hover:bg-gray-50 dark:hover:bg-dark-700 cursor-pointer transition-colors"
+              >
+                <input
+                  type="checkbox"
+                  value={language}
+                  checked={event.languages.includes(language)}
+                  onChange={handleLanguageChange}
+                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                />
+                <span className="text-sm font-medium">{language}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* Галерея фотографий */}
+        <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-dark-600 p-6">
+          <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
+            <ImageIcon className="h-5 w-5 text-primary-600" />
+            Галерея фотографий
+          </h2>
+          
+          <div className="space-y-4">
+            {Array.isArray(event.photo_gallery) && event.photo_gallery.map((photo, index) => (
+              <div key={index} className="flex items-center gap-3 p-3 border border-gray-300 dark:border-dark-600 rounded-lg">
+                <input
+                  type="url"
+                  value={photo || ''}
+                  onChange={(e) => {
+                    const newGallery = [...(event.photo_gallery || [])];
+                    newGallery[index] = e.target.value;
+                    setEvent(prev => ({
+                      ...prev,
+                      photo_gallery: newGallery
+                    }));
+                  }}
+                  className="flex-1 px-3 py-2 rounded border border-gray-300 dark:border-dark-600 bg-white dark:bg-dark-800 text-gray-900 dark:text-white focus:outline-none focus:border-primary-500"
+                  placeholder="URL фотографии"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newGallery = (event.photo_gallery || []).filter((_, i) => i !== index);
+                    setEvent(prev => ({
+                      ...prev,
+                      photo_gallery: newGallery
+                    }));
+                  }}
+                  className="p-2 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 transition-colors"
+                  title="Удалить фотографию"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+            
+            <button
+              type="button"
+              onClick={() => {
+                setEvent(prev => ({
+                  ...prev,
+                  photo_gallery: [...(Array.isArray(prev.photo_gallery) ? prev.photo_gallery : []), '']
+                }));
+              }}
+              className="flex items-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 dark:border-dark-600 rounded-lg text-gray-600 dark:text-gray-400 hover:border-primary-500 hover:text-primary-600 dark:hover:text-primary-400 transition-colors w-full"
+            >
+              <Plus className="h-4 w-4" />
+              Добавить фотографию
+            </button>
+            
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              Вставьте прямую ссылку на изображение (например, из облачного хранилища)
+            </p>
+            
+            {Array.isArray(event.photo_gallery) && event.photo_gallery.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
+                {event.photo_gallery
+                  .filter(photo => typeof photo === 'string' && photo.trim() !== '')
+                  .map((photo, index) => (
+                    <div key={index} className="relative group">
+                      <img
+                        src={photo}
+                        alt={`Preview ${index + 1}`}
+                        className="w-full h-24 object-cover rounded-lg"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.src = 'https://via.placeholder.com/150x100?text=Не+найдено';
+                        }}
+                      />
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+        </div>
+        
+
+{/* // src/pages/admin/CreateEditEventPage.tsx - Готовая часть 7 */}
+
+        {/* Информация об оплате */}
+        <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-dark-600 p-6">
+          <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
+            <DollarSign className="h-5 w-5 text-primary-600" />
+            Информация об оплате
+          </h2>
+          
+          <div className="space-y-6">
+            {/* Тип оплаты */}
+            <div className="form-group">
+              <label className="block font-medium mb-3 text-gray-700 dark:text-gray-300">
+                Тип оплаты
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {paymentTypes.map(type => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => setEvent(prev => ({ ...prev, payment_type: type }))}
+                    className={`p-4 rounded-xl border-2 text-center transition-all duration-200 ${
+                      event.payment_type === type
+                        ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
+                        : 'border-gray-200 dark:border-dark-600 bg-gray-50 dark:bg-dark-700 text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-dark-500'
+                    }`}
+                  >
+                    <div className="font-semibold text-lg mb-1">
+                      {type === 'cost' ? '💰 Платное' : 
+                       type === 'free' ? '🆓 Бесплатное' : 
+                       '💝 Донейшн'}
+                    </div>
+                    <div className="text-sm opacity-75">
+                      {type === 'cost' ? 'Фиксированная цена' : 
+                       type === 'free' ? 'Без оплаты' : 
+                       'Добровольные взносы'}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            {/* Цена и валюта для платных мероприятий */}
+            {event.payment_type === 'cost' && (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="form-group">
+                    <label htmlFor="price" className="block font-medium mb-2 text-gray-700 dark:text-gray-300">
+                      Цена
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        id="price"
+                        name="price"
+                        value={event.price || ''}
+                        onChange={handleInputChange}
+                        className={`w-full px-4 py-3 pr-16 rounded-lg border transition-colors ${
+                          errors.price 
+                            ? 'border-red-500 focus:border-red-500' 
+                            : 'border-gray-300 dark:border-dark-600 focus:border-primary-500'
+                        } bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800`}
+                        placeholder="0"
+                        min="0"
+                        step="100"
+                      />
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                        <span className="text-gray-500 font-medium">{event.currency}</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="form-group">
+                    <label htmlFor="currency" className="block font-medium mb-2 text-gray-700 dark:text-gray-300">
+                      Валюта
+                    </label>
+                    <select
+                      id="currency"
+                      name="currency"
+                      value={event.currency}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-dark-600 bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800"
+                    >
+                      <option value="RUB">RUB (₽)</option>
+                      <option value="EUR">EUR (€)</option>
+                      <option value="USD">USD ($)</option>
+                    </select>
+                  </div>
+                </div>
+                
+                {/* Комментарий к цене */}
+                <div className="form-group">
+                  <label htmlFor="price_comment" className="block font-medium mb-2 text-gray-700 dark:text-gray-300">
+                    Комментарий к цене
+                  </label>
+                  <input
+                    type="text"
+                    id="price_comment"
+                    name="price_comment"
+                    value={event.price_comment || ''}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-dark-600 bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800"
+                    placeholder="Например: включён кофе-брейк, материалы"
+                  />
+                  <p className="text-gray-500 text-sm mt-2">
+                    Дополнительная информация о том, что включено в стоимость
+                  </p>
+                </div>
+              </>
+            )}
+            
+            {/* Настройки онлайн оплаты */}
+            {event.payment_type !== 'free' && (
+              <>
+                <div className="form-group">
+                  <label className="block font-medium mb-3 text-gray-700 dark:text-gray-300">
+                    Онлайн оплата
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setEvent(prev => ({ ...prev, widget_chooser: false }))}
+                      className={`p-4 rounded-xl border-2 text-center transition-all duration-200 ${
+                        !event.widget_chooser
+                          ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
+                          : 'border-gray-200 dark:border-dark-600 bg-gray-50 dark:bg-dark-700 text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-dark-500'
+                      }`}
+                    >
+                      <div className="font-semibold text-lg mb-1">🔗 Ссылка</div>
+                      <div className="text-sm opacity-75">Переход по ссылке</div>
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onClick={() => setEvent(prev => ({ ...prev, widget_chooser: true }))}
+                      className={`p-4 rounded-xl border-2 text-center transition-all duration-200 ${
+                        event.widget_chooser
+                          ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
+                          : 'border-gray-200 dark:border-dark-600 bg-gray-50 dark:bg-dark-700 text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-dark-500'
+                      }`}
+                    >
+                      <div className="font-semibold text-lg mb-1">🛠️ Виджет</div>
+                      <div className="text-sm opacity-75">Встроенная форма</div>
+                    </button>
+                  </div>
+                </div>
+                
+                {!event.widget_chooser ? (
+                  // Поле для ссылки на оплату
+                  <div className="form-group">
+                    <label htmlFor="payment_link" className="block font-medium mb-2 text-gray-700 dark:text-gray-300">
+                      Ссылка на оплату
+                    </label>
+                    <input
+                      type="url"
+                      id="payment_link"
+                      name="payment_link"
+                      value={event.payment_link || ''}
+                      onChange={handleInputChange}
+                      className={`w-full px-4 py-3 rounded-lg border transition-colors ${
+                        errors.payment_link 
+                          ? 'border-red-500 focus:border-red-500' 
+                          : 'border-gray-300 dark:border-dark-600 focus:border-primary-500'
+                      } bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800`}
+                      placeholder="https://..."
+                    />
+                  </div>
+                ) : (
+                  // Поле для ID события Oblakkarte
+                  <div className="form-group">
+                    <label htmlFor="oblakkarte_data_event_id" className="block font-medium mb-2 text-gray-700 dark:text-gray-300">
+                      ID события Oblakkarte
+                    </label>
+                    <input
+                      type="text"
+                      id="oblakkarte_data_event_id"
+                      name="oblakkarte_data_event_id"
+                      value={event.oblakkarte_data_event_id || ''}
+                      onChange={handleInputChange}
+                      className={`w-full px-4 py-3 rounded-lg border transition-colors ${
+                        errors.oblakkarte_data_event_id 
+                          ? 'border-red-500 focus:border-red-500' 
+                          : 'border-gray-300 dark:border-dark-600 focus:border-primary-500'
+                      } bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800`}
+                      placeholder="Например: DoYnhURt"
+                    />
+                    <p className="text-gray-500 text-sm mt-2">
+                      ID события из панели Oblakkarte для интеграции виджета оплаты
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+            
+            {/* Количество возможных регистраций */}
+            <div className="form-group">
+              <label htmlFor="max_registrations" className="block font-medium mb-2 text-gray-700 dark:text-gray-300">
+                Максимальное количество участников
+              </label>
+              <input
+                type="number"
+                id="max_registrations"
+                name="max_registrations"
+                value={event.max_registrations || 40}
+                onChange={handleInputChange}
+                className={`w-full px-4 py-3 rounded-lg border transition-colors ${
+                  errors.max_registrations 
+                    ? 'border-red-500 focus:border-red-500' 
+                    : 'border-gray-300 dark:border-dark-600 focus:border-primary-500'
+                } bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800`}
+                placeholder="40"
+                min="1"
+                step="1"
+              />
+              <p className="text-gray-500 text-sm mt-2">
+                Максимальное количество участников для регистрации на мероприятие
+              </p>
+            </div>
+
+            {/* Скидка для пар */}
+            {event.payment_type === 'cost' && (
+              <div className="form-group">
+                <label htmlFor="couple_discount" className="block font-medium mb-2 text-gray-700 dark:text-gray-300">
+                  Скидка для пар (%)
+                </label>
+                <input
+                  type="number"
+                  id="couple_discount"
+                  name="couple_discount"
+                  value={event.couple_discount || ''}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-dark-600 bg-white dark:bg-dark-700 text-gray-900 dark:text-white focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800"
+                  placeholder="0"
+                  min="0"
+                  max="100"
+                  step="5"
+                />
+                <p className="text-gray-500 text-sm mt-2">
+                  Процент скидки при покупке двух и более взрослых билетов
+                </p>
+              </div>
+            )}
+
+            {/* Настройки для детей - показываем только если мероприятие НЕ для взрослых */}
+            {event.payment_type === 'cost' && event.age_category !== '18+' && (
+              <div className="form-group">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="child_half_price"
+                    name="child_half_price"
+                    checked={event.child_half_price}
+                    onChange={handleCheckboxChange}
+                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="child_half_price" className="block font-medium text-gray-700 dark:text-gray-300">
+                    50% скидка для детей
+                  </label>
+                </div>
+                <p className="text-gray-500 text-sm mt-2 ml-7">
+                  Детские билеты будут стоить в два раза дешевле взрослых
+                </p>
+              </div>
+            )}
+
+            {/* Информация для мероприятий 18+ */}
+            {event.payment_type === 'cost' && event.age_category === '18+' && (
+              <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                <p className="text-sm text-amber-800 dark:text-amber-200">
+                  <strong>Только для взрослых:</strong> Для мероприятий с возрастной категорией 18+ детские билеты не предусмотрены
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        // src/pages/admin/CreateEditEventPage.tsx - Готовая часть 8
+
+        {/* Секция спикеров */}
+        <EventSpeakersSection
+          selectedSpeakerIds={event.speakers}
+          hideSpeakersGallery={event.hide_speakers_gallery}
+          onSpeakerToggle={handleSpeakerToggle}
+          onHideGalleryChange={handleHideSpeakersGalleryChange}
+          allSpeakers={speakers}
+        />
+        
+        {/* Секция программы фестиваля - показывается только для типа "festival" */}
+        <EventFestivalProgramSection
+          eventType={event.event_type}
+          festivalProgram={event.festival_program}
+          allSpeakers={speakers}
+          onFestivalProgramChange={handleFestivalProgramChange}
+        />
+        
+        {/* Кнопки действий */}
+        <div className="flex flex-col sm:flex-row justify-end gap-4 pt-6 border-t border-gray-200 dark:border-dark-600">
+          <button
+            type="button"
+            onClick={() => navigate('/admin/events')}
+            className="px-6 py-3 border border-gray-300 dark:border-dark-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-dark-700 transition-colors"
+          >
+            Отмена
+          </button>
+          <button
+            type="submit"
+            disabled={saving}
+            className="px-6 py-3 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white rounded-lg transition-colors flex items-center justify-center gap-2"
+          >
+            {saving ? (
+              <>
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Сохранение...
+              </>
+            ) : (
+              <>
+                <Save className="h-5 w-5" />
+                Сохранить
+              </>
+            )}
+          </button>
+        </div>
+      </form>
 
       {/* Модальное окно подтверждения удаления */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-dark-800 rounded-xl shadow-xl max-w-md w-full">
-            <div className="p-6">
-              <div className="flex items-center gap-3 text-red-600 mb-4">
-                <AlertTriangle className="w-6 h-6" />
-                <h3 className="text-lg font-semibold">Подтверждение удаления</h3>
-              </div>
-              <p className="text-gray-700 dark:text-gray-300 mb-6">
-                Вы уверены, что хотите удалить это мероприятие? Это действие нельзя отменить.
-              </p>
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={() => setShowDeleteConfirm(false)}
-                  className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
-                >
-                  Отмена
-                </button>
-                <button
-                  onClick={handleDelete}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
-                >
-                  Удалить
-                </button>
-              </div>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-dark-800 rounded-lg max-w-md w-full p-6">
+            <div className="flex items-center gap-3 text-red-600 mb-4">
+              <AlertTriangle className="h-6 w-6" />
+              <h3 className="text-lg font-semibold">Подтверждение удаления</h3>
+            </div>
+            <p className="mb-6 text-gray-700 dark:text-gray-300">
+              Вы уверены, что хотите удалить это мероприятие? Это действие нельзя отменить.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2 border border-gray-300 dark:border-dark-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-dark-700 transition-colors"
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+              >
+                Удалить
+              </button>
             </div>
           </div>
         </div>
