@@ -1,19 +1,19 @@
-// src/pages/admin/AdminRent.tsx - Унифицированная версия
+// src/pages/admin/AdminRent.tsx - Версия для существующей таблицы rent_info_settings
 import React, { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { 
   Save, 
   Loader2, 
-  Info, 
-  ImageIcon, 
-  Upload, 
   Building2, 
   Plus, 
+  Edit, 
   Trash2, 
-  Edit,
+  Upload, 
   DollarSign,
   Clock,
-  Check
+  Check,
+  Eye,
+  ImageIcon
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -23,19 +23,20 @@ const supabase = createClient(
 );
 
 interface RentSettings {
+  id?: number;
   title: string;
   description: string;
-  main_prices: {
-    hourly: number;
-    daily: number;
-  };
-  included_services: string[];
+  photos: string[];
   pricelist: Array<{
     name: string;
     price: number;
     description?: string;
   }>;
-  photos: string[];
+  contacts: {
+    phone?: string;
+    email?: string;
+    address?: string;
+  };
 }
 
 const AdminRent: React.FC = () => {
@@ -43,16 +44,15 @@ const AdminRent: React.FC = () => {
   const [settings, setSettings] = useState<RentSettings>({
     title: '',
     description: '',
-    main_prices: { hourly: 0, daily: 0 },
-    included_services: [],
+    photos: [],
     pricelist: [],
-    photos: []
+    contacts: {}
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [newService, setNewService] = useState('');
   const [newPriceItem, setNewPriceItem] = useState({ name: '', price: 0, description: '' });
+  const [previewMode, setPreviewMode] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // === ЗАГРУЗКА ДАННЫХ ===
@@ -64,14 +64,21 @@ const AdminRent: React.FC = () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('rent_settings')
+        .from('rent_info_settings')
         .select('*')
         .single();
 
       if (error && error.code !== 'PGRST116') throw error;
       
       if (data) {
-        setSettings(data);
+        setSettings({
+          id: data.id,
+          title: data.title || '',
+          description: data.description || '',
+          photos: data.photos || [],
+          pricelist: data.pricelist || [],
+          contacts: data.contacts || {}
+        });
       }
     } catch (error) {
       console.error('Error fetching rent settings:', error);
@@ -85,13 +92,33 @@ const AdminRent: React.FC = () => {
   const handleSave = async () => {
     try {
       setSaving(true);
-      const { error } = await supabase
-        .from('rent_settings')
-        .upsert(settings);
+      
+      const updateData = {
+        title: settings.title,
+        description: settings.description,
+        photos: settings.photos,
+        pricelist: settings.pricelist,
+        contacts: settings.contacts
+      };
 
-      if (error) throw error;
+      let result;
+      if (settings.id) {
+        // Обновляем существующую запись
+        result = await supabase
+          .from('rent_info_settings')
+          .update(updateData)
+          .eq('id', settings.id);
+      } else {
+        // Создаем новую запись
+        result = await supabase
+          .from('rent_info_settings')
+          .insert([updateData]);
+      }
+
+      if (result.error) throw result.error;
       
       toast.success('Настройки аренды сохранены');
+      await fetchSettings(); // Перезагружаем данные
     } catch (error) {
       console.error('Error saving rent settings:', error);
       toast.error('Ошибка при сохранении настроек');
@@ -151,23 +178,6 @@ const AdminRent: React.FC = () => {
     }
   };
 
-  const addIncludedService = () => {
-    if (!newService.trim()) return;
-    
-    setSettings(prev => ({
-      ...prev,
-      included_services: [...prev.included_services, newService.trim()]
-    }));
-    setNewService('');
-  };
-
-  const removeIncludedService = (index: number) => {
-    setSettings(prev => ({
-      ...prev,
-      included_services: prev.included_services.filter((_, i) => i !== index)
-    }));
-  };
-
   const addPriceItem = () => {
     if (!newPriceItem.name.trim() || newPriceItem.price <= 0) {
       toast.error('Заполните название и цену');
@@ -200,6 +210,80 @@ const AdminRent: React.FC = () => {
     );
   }
 
+  // === ПРЕВЬЮ ===
+  if (previewMode) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <div className="fixed top-4 right-4 z-50">
+          <button
+            onClick={() => setPreviewMode(false)}
+            className="p-2 bg-white dark:bg-gray-800 rounded-full shadow-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white transition-colors"
+          >
+            <Eye className="w-5 h-5" />
+          </button>
+        </div>
+        
+        <div className="container mx-auto px-4 py-16">
+          <div className="text-center mb-16">
+            <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-6">
+              {settings.title || 'Аренда помещений'}
+            </h1>
+            <p className="text-lg text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
+              {settings.description}
+            </p>
+          </div>
+
+          {/* Фотогалерея */}
+          {settings.photos.length > 0 && (
+            <div className="mb-16">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-8 text-center">
+                Фотогалерея
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {settings.photos.map((photo, index) => (
+                  <img
+                    key={index}
+                    src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/images/${photo}`}
+                    alt={`Rent photo ${index + 1}`}
+                    className="w-full h-64 object-cover rounded-lg shadow-sm"
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Прайс-лист */}
+          {settings.pricelist.length > 0 && (
+            <div className="mb-16">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-8 text-center">
+                Прайс-лист
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {settings.pricelist.map((item, index) => (
+                  <div key={index} className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm">
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                        {item.name}
+                      </h3>
+                      <span className="text-xl font-bold text-primary-600 dark:text-primary-400">
+                        {item.price} €
+                      </span>
+                    </div>
+                    {item.description && (
+                      <p className="text-gray-600 dark:text-gray-300 text-sm">
+                        {item.description}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   // === РЕНДЕР ===
   return (
     <div className="space-y-6">
@@ -219,31 +303,40 @@ const AdminRent: React.FC = () => {
               </div>
             </div>
             
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {saving ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Сохранение...
-                </>
-              ) : (
-                <>
-                  <Save className="w-4 h-4" />
-                  Сохранить
-                </>
-              )}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPreviewMode(true)}
+                className="flex items-center gap-2 px-3 py-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors text-sm"
+              >
+                <Eye className="w-4 h-4" />
+                Превью
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Сохранение...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    Сохранить
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
 
         <div className="p-6 space-y-6">
-          {/* Основные настройки */}
+          {/* Основная информация */}
           <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-4">
-              <Info className="w-5 h-5 text-gray-500" />
+              <Building2 className="w-5 h-5 text-gray-500" />
               <h3 className="text-lg font-medium text-gray-900 dark:text-white">Основная информация</h3>
             </div>
             
@@ -276,108 +369,78 @@ const AdminRent: React.FC = () => {
             </div>
           </div>
 
-          {/* Основные цены */}
+          {/* Контактная информация */}
           <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-4">
-              <DollarSign className="w-5 h-5 text-gray-500" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Основные цены</h3>
+              <Clock className="w-5 h-5 text-gray-500" />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Контактная информация</h3>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Почасовая аренда (€)
+                  Телефон
                 </label>
                 <input
-                  type="number"
-                  value={settings.main_prices.hourly}
+                  type="tel"
+                  value={settings.contacts.phone || ''}
                   onChange={(e) => setSettings(prev => ({
                     ...prev,
-                    main_prices: { ...prev.main_prices, hourly: Number(e.target.value) }
+                    contacts: { ...prev.contacts, phone: e.target.value }
                   }))}
-                  className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
-                  min="0"
-                  step="0.01"
+                  className="w-full p-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-sm"
+                  placeholder="+381 11 123 4567"
                 />
               </div>
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Дневная аренда (€)
+                  Email
                 </label>
                 <input
-                  type="number"
-                  value={settings.main_prices.daily}
+                  type="email"
+                  value={settings.contacts.email || ''}
                   onChange={(e) => setSettings(prev => ({
                     ...prev,
-                    main_prices: { ...prev.main_prices, daily: Number(e.target.value) }
+                    contacts: { ...prev.contacts, email: e.target.value }
                   }))}
-                  className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
-                  min="0"
-                  step="0.01"
+                  className="w-full p-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-sm"
+                  placeholder="info@rent.com"
                 />
               </div>
-            </div>
-          </div>
-
-          {/* Включенные услуги */}
-          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-4">
-              <Check className="w-5 h-5 text-gray-500" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Включенные услуги</h3>
-            </div>
-            
-            <div className="space-y-3">
-              {/* Добавление новой услуги */}
-              <div className="flex gap-2">
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Адрес
+                </label>
                 <input
                   type="text"
-                  value={newService}
-                  onChange={(e) => setNewService(e.target.value)}
-                  placeholder="Название услуги"
-                  className="flex-1 p-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-sm"
-                  onKeyPress={(e) => e.key === 'Enter' && addIncludedService()}
+                  value={settings.contacts.address || ''}
+                  onChange={(e) => setSettings(prev => ({
+                    ...prev,
+                    contacts: { ...prev.contacts, address: e.target.value }
+                  }))}
+                  className="w-full p-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-sm"
+                  placeholder="Белград, Сербия"
                 />
-                <button
-                  onClick={addIncludedService}
-                  className="px-3 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
-              </div>
-              
-              {/* Список услуг */}
-              <div className="space-y-2">
-                {settings.included_services.map((service, index) => (
-                  <div key={index} className="flex items-center justify-between bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-600">
-                    <div className="flex items-center gap-2">
-                      <Check className="w-4 h-4 text-green-500" />
-                      <span className="text-gray-900 dark:text-white text-sm">{service}</span>
-                    </div>
-                    <button
-                      onClick={() => removeIncludedService(index)}
-                      className="p-1 text-red-500 hover:text-red-700 transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
               </div>
             </div>
           </div>
 
-          {/* Дополнительные услуги */}
+          {/* Прайс-лист */}
           <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-4">
-              <DollarSign className="w-5 h-5 text-gray-500" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Прайс-лист дополнительных услуг</h3>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <DollarSign className="w-5 h-5 text-gray-500" />
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Прайс-лист услуг</h3>
+              </div>
             </div>
             
             <div className="space-y-4">
               {/* Добавление новой услуги */}
               <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-600">
                 <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Добавить услугу</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                   <input
                     type="text"
                     value={newPriceItem.name}
@@ -394,6 +457,13 @@ const AdminRent: React.FC = () => {
                     min="0"
                     step="0.01"
                   />
+                  <input
+                    type="text"
+                    value={newPriceItem.description}
+                    onChange={(e) => setNewPriceItem(prev => ({ ...prev, description: e.target.value }))}
+                    placeholder="Описание"
+                    className="p-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-sm"
+                  />
                   <button
                     onClick={addPriceItem}
                     className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors text-sm font-medium"
@@ -401,13 +471,6 @@ const AdminRent: React.FC = () => {
                     Добавить
                   </button>
                 </div>
-                <input
-                  type="text"
-                  value={newPriceItem.description}
-                  onChange={(e) => setNewPriceItem(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Описание (необязательно)"
-                  className="w-full mt-3 p-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-sm"
-                />
               </div>
               
               {/* Список услуг */}
@@ -500,4 +563,4 @@ const AdminRent: React.FC = () => {
   );
 };
 
-export default AdminRent; 
+export default AdminRent;
