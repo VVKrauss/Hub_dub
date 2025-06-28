@@ -399,7 +399,7 @@ const AdminHomeHeader: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <IconComponent className="w-5 h-5 text-gray-500" />
                     <h3 className="text-lg font-medium text-gray-900 dark:text-white">{sectionTitle}</h3>
-                  </div>
+                  </div> 
                   <input
                     type="checkbox"
                     checked={section?.enabled || false}
