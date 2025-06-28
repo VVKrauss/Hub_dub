@@ -214,7 +214,7 @@ const AdminSpeakers: React.FC = () => {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white dark:bg-gray-500 divide-y divide-gray-200 dark:divide-gray-700">
+                <tbody className="bg-white dark:bg-gray-600 divide-y divide-gray-200 dark:divide-gray-700">
                   {filteredSpeakers.length === 0 ? (
                     <tr>
                       <td colSpan={4} className="px-6 py-12 text-center">
