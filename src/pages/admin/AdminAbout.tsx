@@ -1,4 +1,4 @@
-// src/pages/admin/AdminAbout.tsx - Исправленная версия для about_table
+// src/pages/admin/AdminAbout.tsx - Часть 1
 import React, { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { 
@@ -65,7 +65,7 @@ interface AboutData {
 }
 
 const AdminAbout: React.FC = () => {
-  // Состояния
+  // Основные состояния
   const [aboutData, setAboutData] = useState<AboutData>({
     project_info: '',
     team_members: [],
@@ -76,9 +76,13 @@ const AdminAbout: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [previewMode, setPreviewMode] = useState(false);
+
+  // Состояния для форм
   const [showTeamForm, setShowTeamForm] = useState(false);
   const [showContributorForm, setShowContributorForm] = useState(false);
   const [showPlatformForm, setShowPlatformForm] = useState(false);
+
+  // Состояния для редактирования
   const [editTeamMember, setEditTeamMember] = useState<TeamMember>({
     name: '',
     role: '',
@@ -95,6 +99,8 @@ const AdminAbout: React.FC = () => {
     url: '',
     description: ''
   });
+
+  // Индексы для редактирования
   const [editingContributorIndex, setEditingContributorIndex] = useState<number | null>(null);
   const [editingTeamIndex, setEditingTeamIndex] = useState<number | null>(null);
   const [editingPlatformIndex, setEditingPlatformIndex] = useState<number | null>(null);
@@ -168,6 +174,42 @@ const AdminAbout: React.FC = () => {
       setSaving(false);
     }
   };
+
+  // === ЗАГРУЗКА ФАЙЛОВ ===
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, type: 'team' | 'contributor' | 'platform') => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `about/${type}/${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('images')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('images')
+        .getPublicUrl(fileName);
+
+      if (type === 'team') {
+        setEditTeamMember(prev => ({ ...prev, photo: publicUrl }));
+      } else if (type === 'contributor') {
+        setEditContributor(prev => ({ ...prev, photo: publicUrl }));
+      } else {
+        setEditPlatform(prev => ({ ...prev, logo: publicUrl }));
+      }
+
+      toast.success('Изображение загружено');
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast.error('Ошибка при загрузке изображения');
+    }
+  };
+
+  // src/pages/admin/AdminAbout.tsx - Часть 2: Функции для работы с данными
 
   // === ФУНКЦИИ ДЛЯ КОМАНДЫ ===
   const saveTeamMember = () => {
@@ -274,40 +316,6 @@ const AdminAbout: React.FC = () => {
     setShowPlatformForm(true);
   };
 
-  // === ЗАГРУЗКА ФАЙЛОВ ===
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, type: 'team' | 'contributor' | 'platform') => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `about/${type}/${Date.now()}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('images')
-        .upload(fileName, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('images')
-        .getPublicUrl(fileName);
-
-      if (type === 'team') {
-        setEditTeamMember(prev => ({ ...prev, photo: publicUrl }));
-      } else if (type === 'contributor') {
-        setEditContributor(prev => ({ ...prev, photo: publicUrl }));
-      } else {
-        setEditPlatform(prev => ({ ...prev, logo: publicUrl }));
-      }
-
-      toast.success('Изображение загружено');
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      toast.error('Ошибка при загрузке изображения');
-    }
-  };
-
   // === СОСТОЯНИЕ ЗАГРУЗКИ ===
   if (loading) {
     return (
@@ -319,6 +327,8 @@ const AdminAbout: React.FC = () => {
       </div>
     );
   }
+
+  // src/pages/admin/AdminAbout.tsx - Часть 3: Главный интерфейс
 
   // === РЕНДЕР ===
   return (
@@ -462,6 +472,8 @@ const AdminAbout: React.FC = () => {
             </div>
           </div>
 
+         // src/pages/admin/AdminAbout.tsx - Часть 4: Блоки команды и контрибьюторов
+
           {/* Команда */}
           <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
             <div className="flex items-center justify-between mb-4">
@@ -580,6 +592,89 @@ const AdminAbout: React.FC = () => {
                             }}
                             className="w-full p-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
                             placeholder="Описание вклада"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Веб-сайт
+                          </label>
+                          <div className="flex gap-2">
+                            <input
+                              type="url"
+                              value={contributor.website || ''}
+                              onChange={(e) => {
+                                setAboutData(prev => ({
+                                  ...prev,
+                                  contributors: prev.contributors.map((c, i) => 
+                                    i === index ? { ...c, website: e.target.value } : c
+                                  )
+                                }));
+                              }}
+                              className="flex-1 p-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                              placeholder="https://example.com"
+                            />
+                            <button
+                              onClick={() => editContributor(index)}
+                              className="p-2 text-gray-400 hover:text-blue-600 transition-colors flex-shrink-0"
+                              title="Редактировать фото"
+                            >
+                              <ImageIcon className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => deleteContributor(index)}
+                              className="p-2 text-gray-400 hover:text-red-600 transition-colors flex-shrink-0"
+                              title="Удалить контрибьютора"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Форма добавления нового контрибьютора */}
+            {showContributorForm ? (
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                    {editingContributorIndex !== null ? 'Редактировать контрибьютора' : 'Новый контрибьютор'}
+                  </h4>
+                  <button
+                    onClick={() => {
+                      setShowContributorForm(false);
+                      setEditContributor({ name: '', contribution: '', website: '' });
+                      setEditingContributorIndex(null);
+                    }}
+                    className="p-1 text-blue-400 hover:text-blue-600 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                
+                <div className="space-y-3">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                      <input
+                        type="text"
+                        value={editContributor.name}
+                        onChange={(e) => setEditContributor(prev => ({ ...prev, name: e.target.value }))}
+                        className="w-full p-2 text-sm border border-blue-200 dark:border-blue-700 rounded-lg bg-white dark:bg-blue-900/30 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        placeholder="Имя контрибьютора *"
+                      />
+                    </div>
+                    
+                    <div>
+                      <input
+                        type="text"
+                        value={editContributor.contribution || ''}
+                        onChange={(e) => setEditContributor(prev => ({ ...prev, contribution: e.target.value }))}
+                        className="w-full p-2 text-sm border border-blue-200 dark:border-blue-700 rounded-lg bg-white dark:bg-blue-900/30 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        placeholder="Описание вклада"
                       />
                     </div>
                     
@@ -651,6 +746,8 @@ const AdminAbout: React.FC = () => {
             )}
           </div>
 
+          {/* // src/pages/admin/AdminAbout.tsx - Часть 5: Платформы поддержки и модальные окна
+ */}
           {/* Платформы поддержки */}
           <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
             <div className="flex items-center justify-between mb-4">
@@ -819,6 +916,8 @@ const AdminAbout: React.FC = () => {
         </div>
       )}
 
+      {/* // src/pages/admin/AdminAbout.tsx - Часть 6: Модальное окно платформ и экспорт
+ */}
       {/* Модальное окно для платформ поддержки */}
       {showPlatformForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -928,87 +1027,4 @@ const AdminAbout: React.FC = () => {
   );
 };
 
-export default AdminAbout;клада"
-                          />
-                        </div>
-                        
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            Веб-сайт
-                          </label>
-                          <div className="flex gap-2">
-                            <input
-                              type="url"
-                              value={contributor.website || ''}
-                              onChange={(e) => {
-                                setAboutData(prev => ({
-                                  ...prev,
-                                  contributors: prev.contributors.map((c, i) => 
-                                    i === index ? { ...c, website: e.target.value } : c
-                                  )
-                                }));
-                              }}
-                              className="flex-1 p-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
-                              placeholder="https://example.com"
-                            />
-                            <button
-                              onClick={() => editContributor(index)}
-                              className="p-2 text-gray-400 hover:text-blue-600 transition-colors flex-shrink-0"
-                              title="Редактировать фото"
-                            >
-                              <ImageIcon className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => deleteContributor(index)}
-                              className="p-2 text-gray-400 hover:text-red-600 transition-colors flex-shrink-0"
-                              title="Удалить контрибьютора"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Форма добавления нового контрибьютора */}
-            {showContributorForm ? (
-              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                    {editingContributorIndex !== null ? 'Редактировать контрибьютора' : 'Новый контрибьютор'}
-                  </h4>
-                  <button
-                    onClick={() => {
-                      setShowContributorForm(false);
-                      setEditContributor({ name: '', contribution: '', website: '' });
-                      setEditingContributorIndex(null);
-                    }}
-                    className="p-1 text-blue-400 hover:text-blue-600 transition-colors"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-                
-                <div className="space-y-3">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div>
-                      <input
-                        type="text"
-                        value={editContributor.name}
-                        onChange={(e) => setEditContributor(prev => ({ ...prev, name: e.target.value }))}
-                        className="w-full p-2 text-sm border border-blue-200 dark:border-blue-700 rounded-lg bg-white dark:bg-blue-900/30 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                        placeholder="Имя контрибьютора *"
-                      />
-                    </div>
-                    
-                    <div>
-                      <input
-                        type="text"
-                        value={editContributor.contribution || ''}
-                        onChange={(e) => setEditContributor(prev => ({ ...prev, contribution: e.target.value }))}
-                        className="w-full p-2 text-sm border border-blue-200 dark:border-blue-700 rounded-lg bg-white dark:bg-blue-900/30 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                        placeholder="Описание в
+export default AdminAbout;
