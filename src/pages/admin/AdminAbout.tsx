@@ -748,8 +748,8 @@ const AdminAbout: React.FC = () => {
           </div>
 
           
-          {/* // src/pages/admin/AdminAbout.tsx - Часть 5: Платформы поддержки и модальные окна
- */}
+         // src/pages/admin/AdminAbout.tsx - Часть 5: Платформы поддержки и модальные окна
+
           {/* Платформы поддержки */}
           <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
             <div className="flex items-center justify-between mb-4">
@@ -779,8 +779,8 @@ const AdminAbout: React.FC = () => {
                         <img
                           src={platform.logo}
                           alt={platform.platform}
-                          className="w-8 h-8 object-cover mb-2"   
-                        /> 
+                          className="w-8 h-8 object-cover mb-2"
+                        />
                       )}
                       <h4 className="font-medium text-gray-900 dark:text-white text-sm">{platform.platform}</h4>
                       <a href={platform.url} target="_blank" rel="noopener noreferrer" className="text-primary-600 dark:text-primary-400 text-xs hover:underline break-all">
@@ -789,7 +789,7 @@ const AdminAbout: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-1">
                       <button
-                        onClick={() => editPlatform(index)}
+                        onClick={() => handleEditPlatform(index)}
                         className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
                       >
                         <Edit className="w-3 h-3" />
