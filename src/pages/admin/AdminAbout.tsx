@@ -805,8 +805,6 @@ const AdminAbout: React.FC = () => {
         </div>
       )}
 
-     // Заменить секцию контрибьюторов в AdminAbout.tsx на:
-
 {/* Контрибьюторы - inline форма */}
 <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
   <div className="flex items-center justify-between mb-4">
