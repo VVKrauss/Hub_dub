@@ -469,7 +469,7 @@ const AdminCalendarPage: React.FC = () => {
           </div>
 
           {/* Calendar content */}
-          <div className="bg-gray-50 dark:bg-gray-500 rounded-lg p-4 min-h-[400px]">
+          <div className="bg-gray-50 dark:bg-gray-600 rounded-lg p-4 min-h-[400px]">
             {viewMode === 'day' && renderDayView()}
             {viewMode === 'week' && renderWeekView()}
             {viewMode === 'month' && renderMonthView()}
