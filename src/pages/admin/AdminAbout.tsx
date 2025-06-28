@@ -353,6 +353,92 @@ const AdminAbout: React.FC = () => {
             </div>
           )}
 
+          {/* Контрибьюторы */}
+          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Edit className="w-5 h-5 text-gray-500" />
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Контрибьюторы</h3>
+              </div>
+              <button
+                onClick={() => {
+                  setEditContributor({ name: '', contribution: '', website: '' });
+                  setShowContributorForm(true);
+                }}
+                className="flex items-center gap-2 px-3 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors text-sm"
+              >
+                <Plus className="w-4 h-4" />
+                Добавить контрибьютора
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {aboutData.contributors.map((contributor) => (
+                <div key={contributor.id} className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1">
+                      <h4 className="font-medium text-gray-900 dark:text-white text-sm">{contributor.name}</h4>
+                      <p className="text-primary-600 dark:text-primary-400 text-xs">{contributor.contribution}</p>
+                      {contributor.website && (
+                        <a href={contributor.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 text-xs hover:underline">
+                          {contributor.website}
+                        </a>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => {
+                          setEditContributor(contributor);
+                          setShowContributorForm(true);
+                        }}
+                        className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                      >
+                        <Edit className="w-3 h-3" />
+                      </button>
+                      <button
+                        onClick={() => deleteContributor(contributor.id!)}
+                        className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Контрибьюторы */}
+          {aboutData.contributors.length > 0 && (
+            <div className="mb-16">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-8 text-center">
+                Контрибьюторы
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {aboutData.contributors.map((contributor) => (
+                  <div key={contributor.id} className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm text-center">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                      {contributor.name}
+                    </h3>
+                    <p className="text-gray-600 dark:text-gray-300 text-sm mb-2">
+                      {contributor.contribution}
+                    </p>
+                    {contributor.website && (
+                      <a
+                        href={contributor.website}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary-600 dark:text-primary-400 text-sm hover:underline"
+                      >
+                        Веб-сайт
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Платформы поддержки */}
           {aboutData.support_platforms.length > 0 && (
             <div className="mb-16">
@@ -712,6 +798,83 @@ const AdminAbout: React.FC = () => {
                   className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
                 >
                   {editTeamMember.id ? 'Обновить' : 'Добавить'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Модальное окно для контрибьюторов */}
+      {showContributorForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-dark-800 rounded-xl shadow-xl max-w-md w-full">
+            <div className="p-6 border-b border-gray-200 dark:border-dark-700">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                  {editContributor.id ? 'Редактировать контрибьютора' : 'Добавить контрибьютора'}
+                </h2>
+                <button
+                  onClick={() => setShowContributorForm(false)}
+                  className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Имя *
+                </label>
+                <input
+                  type="text"
+                  value={editContributor.name}
+                  onChange={(e) => setEditContributor(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                  placeholder="Имя контрибьютора"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Вклад *
+                </label>
+                <input
+                  type="text"
+                  value={editContributor.contribution}
+                  onChange={(e) => setEditContributor(prev => ({ ...prev, contribution: e.target.value }))}
+                  className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                  placeholder="Описание вклада"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Веб-сайт
+                </label>
+                <input
+                  type="url"
+                  value={editContributor.website}
+                  onChange={(e) => setEditContributor(prev => ({ ...prev, website: e.target.value }))}
+                  className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                  placeholder="https://example.com"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <button
+                  onClick={() => setShowContributorForm(false)}
+                  className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
+                >
+                  Отмена
+                </button>
+                <button
+                  onClick={saveContributor}
+                  className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
+                >
+                  {editContributor.id ? 'Обновить' : 'Добавить'}
                 </button>
               </div>
             </div>
