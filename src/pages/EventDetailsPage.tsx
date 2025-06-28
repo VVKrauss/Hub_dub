@@ -1,16 +1,15 @@
+// src/pages/EventDetailsPage.tsx - Упрощенная версия без модальных окон
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { createClient } from '@supabase/supabase-js';
 import { Calendar, Clock, MapPin, Users, Globe, Share2, ArrowLeft } from 'lucide-react';
 import Layout from '../components/layout/Layout';
-import RegistrationModal from '../components/events/RegistrationModal';
-import PaymentOptionsModal from '../components/events/PaymentOptionsModal';
+import EventRegistrationBlock from '../components/events/EventRegistrationBlock';
 import { toast } from 'react-hot-toast';
 import { EventRegistrations } from './admin/constants';
 import { 
   formatRussianDate, 
   formatTimeFromTimestamp, 
-  formatTimeRange,
   isPastEvent 
 } from '../utils/dateTimeUtils';
 
@@ -27,21 +26,12 @@ interface Speaker {
   photos: { url: string; isMain?: boolean }[];
 }
 
-interface FestivalProgramItem {
-  title: string;
-  description: string;
-  image_url: string;
-  start_time: string;
-  end_time: string;
-  lecturer_id: string;
-}
 interface Event { 
   id: string;
   title: string;
   description: string;
   event_type: string;
   bg_image: string;
-  // Используем новые поля timestamptz
   start_at: string;
   end_at: string;
   location?: string;
@@ -51,16 +41,13 @@ interface Event {
   status: string;
   payment_type: string;
   payment_link?: string;
-  payment_widget_id?: string;
+  oblakkarte_data_event_id?: string;
   languages: string[];
   speakers: string[];
-  festival_program?: FestivalProgramItem[];
   registrations?: EventRegistrations;
   video_url?: string;
   photo_gallery?: string[] | string;
-  // Удаляем legacy поля полностью, так как они больше не используются
 }
-
 
 // Helper function to safely parse photo gallery
 const parsePhotoGallery = (photoGallery: string[] | string | null | undefined): string[] => {
@@ -93,74 +80,33 @@ const renderDescriptionWithLinks = (description: string) => {
   const parts = [];
   let lastIndex = 0;
   let match;
-  const linkRegex = /<a\s+(?:[^>]*?\s+)?href=(["'])(.*?)\1(?:[^>]*?)>(.*?)<\/a>/g;
+  const linkRegex = /<a\s+(?:[^>]*?\s+)?href=(["'])(.*?)\1(?:[^>]*?)>(.*?)<\/a>/gi;
 
   while ((match = linkRegex.exec(description)) !== null) {
     if (match.index > lastIndex) {
-      parts.push({
-        type: 'text',
-        content: description.substring(lastIndex, match.index)
-      });
+      parts.push(description.slice(lastIndex, match.index));
     }
-
-    parts.push({
-      type: 'link',
-      url: match[2],
-      text: match[3]
-    });
-
+    
+    parts.push(
+      <a
+        key={match.index}
+        href={match[2]}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 underline"
+      >
+        {match[3]}
+      </a>
+    );
+    
     lastIndex = linkRegex.lastIndex;
   }
 
   if (lastIndex < description.length) {
-    parts.push({
-      type: 'text',
-      content: description.substring(lastIndex)
-    });
+    parts.push(description.slice(lastIndex));
   }
 
-  if (parts.length === 0) {
-    return <span>{description}</span>;
-  }
-
-  return (
-    <>
-      {parts.map((part, index) => {
-        if (part.type === 'text') {
-          return <span key={index}>{part.content}</span>;
-        } else if (part.type === 'link') {
-          return (
-            <a
-              key={index}
-              href={part.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary-600 dark:text-primary-400 hover:opacity-80 underline"
-            >
-              {part.text}
-            </a>
-          );
-        }
-        return null;
-      })}
-    </>
-  );
-};
-
-const renderEventDescription = (text: string) => {
-  if (!text) return null;
-  
-  const paragraphs = text.split(/\n\s*\n/);
-  
-  return (
-    <div className="prose dark:prose-invert max-w-none">
-      {paragraphs.map((paragraph, i) => (
-        <p key={i} className="mb-4">
-          {renderDescriptionWithLinks(paragraph)}
-        </p>
-      ))}
-    </div>
-  );
+  return <div className="whitespace-pre-line">{parts.length > 0 ? parts : description}</div>;
 };
 
 const EventDetailsPage = () => {
@@ -170,42 +116,28 @@ const EventDetailsPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showShareMenu, setShowShareMenu] = useState(false);
-  const [showRegistrationModal, setShowRegistrationModal] = useState(false);
-  const [showPaymentOptions, setShowPaymentOptions] = useState(false);
 
   useEffect(() => {
-    window.scrollTo(0, 0);
-    fetchEventData();
+    if (id) {
+      fetchEventData(id);
+    }
   }, [id]);
 
-  const fetchEventData = async () => {
+  const fetchEventData = async (eventId: string) => {
     try {
       setLoading(true);
-      
-      // Получаем событие с временным слотом
+      setError(null);
+
       const { data: eventData, error: eventError } = await supabase
         .from('events')
-        .select(`
-          *,
-          time_slot:time_slots_table!fk_time_slots_event(
-            id,
-            start_at,
-            end_at
-          )
-        `)
-        .eq('id', id)
+        .select('*')
+        .eq('id', eventId)
         .single();
 
       if (eventError) throw eventError;
+      if (!eventData) throw new Error('Мероприятие не найдено');
 
-      // Обогащаем событие временными данными из слота
-      const enrichedEvent = {
-        ...eventData,
-        start_at: eventData.time_slot?.[0]?.start_at || eventData.start_at,
-        end_at: eventData.time_slot?.[0]?.end_at || eventData.end_at
-      };
-
-      setEvent(enrichedEvent);
+      setEvent(eventData);
 
       if (eventData.speakers?.length) {
         const { data: speakersData, error: speakersError } = await supabase
@@ -249,51 +181,21 @@ const EventDetailsPage = () => {
     setShowShareMenu(false);
   };
 
-  const handlePaymentOptionSelect = (option: 'online' | 'venue') => {
-    setShowPaymentOptions(false);
-    
-    if (option === 'online' && event?.payment_link) {
-      window.open(event.payment_link, '_blank');
-    } else if (option === 'venue') {
-      setShowRegistrationModal(true);
+  const handleRegistrationSuccess = () => {
+    // Обновляем данные события после успешной регистрации
+    if (id) {
+      fetchEventData(id);
     }
   };
-
-  const handleRegisterClick = () => {
-    if (event?.payment_type === 'free' || event?.payment_type === 'donation') {
-      setShowRegistrationModal(true);
-    } else if (event?.price === null && event?.payment_link) {
-      // For online payment only events, redirect directly to payment link
-      window.open(event.payment_link, '_blank');
-    } else {
-      setShowPaymentOptions(true);
-    }
-  };
-
-  // Helper function to get max registrations from either new or legacy structure
-  const getMaxRegistrations = (): number | null => {
-    if (event?.registrations?.max_regs !== undefined) {
-      return event.registrations.max_regs;
-    }
-    return event?.max_registrations || null;
-  };
-
-  // Helper function to get current registration count from either new or legacy structure
-  const getCurrentRegistrationCount = (): number => {
-    if (event?.registrations?.current !== undefined) {
-      return event.registrations.current;
-    }
-    return event?.current_registration_count || 0;
-  };
-
-  // Проверяем является ли событие прошедшим используя утилиту
-  const isEventPast = event?.end_at ? isPastEvent(event.end_at) : false;
 
   if (loading) {
     return (
       <Layout>
         <div className="min-h-screen flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+            <p className="text-gray-600 dark:text-gray-300">Загрузка мероприятия...</p>
+          </div>
         </div>
       </Layout>
     );
@@ -302,358 +204,303 @@ const EventDetailsPage = () => {
   if (error || !event) {
     return (
       <Layout>
-        <div className="min-h-screen flex items-center justify-center text-red-600 dark:text-red-400">
-          {error || 'Мероприятие не найдено'}
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+              {error || 'Мероприятие не найдено'}
+            </h1>
+            <Link 
+              to="/events" 
+              className="text-primary-600 hover:text-primary-700 dark:text-primary-400"
+            >
+              ← Вернуться к мероприятиям
+            </Link>
+          </div>
         </div>
       </Layout>
     );
   }
 
-  const maxRegistrations = getMaxRegistrations();
-  const currentRegistrationCount = getCurrentRegistrationCount();
-  
-  // Safely parse photo gallery
+  // Проверяем является ли событие прошедшим
+  const isEventPast = event?.end_at ? isPastEvent(event.end_at) : false;
   const photoGallery = parsePhotoGallery(event.photo_gallery);
 
   return (
     <Layout>
-      {/* Hero блок */}
-      <div 
-        className="h-[400px] bg-cover bg-center relative"
-        style={{ 
-          backgroundImage: event.bg_image 
-            ? `url(${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/images/${event.bg_image})`
-            : 'url(https://via.placeholder.com/1920x400?text=No+image)'
-        }}
-      >
-        <div className="absolute inset-0 bg-black/50" />
-        <div className="container relative h-full flex items-end pb-12">
-          <div className="text-white">
-            <Link 
-              to="/events"
-              className="inline-flex items-center text-white/80 hover:text-white mb-4"
-            >
-              <ArrowLeft className="h-5 w-5 mr-2" />
-              Назад к мероприятиям
-            </Link>
-            
-            <div className="hidden md:block">
-              <h1 className="text-4xl font-bold mb-4">{event.title}</h1>
-              <div className="flex flex-wrap gap-6 text-white/90">
-                {event.start_at && (
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-5 w-5" />
+      <main className="min-h-screen">
+        <div className="relative">
+          {/* Hero секция с изображением */}
+          {event.bg_image && (
+            <div className="relative h-64 md:h-96 overflow-hidden">
+              <img
+                src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/images/${event.bg_image}`}
+                alt={event.title}
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-black bg-opacity-40"></div>
+              
+              {/* Навигация */}
+              <div className="absolute top-4 left-4">
+                <Link
+                  to="/events"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-lg transition-all"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  К мероприятиям
+                </Link>
+              </div>
+
+              {/* Заголовок */}
+              <div className="absolute bottom-6 left-6 right-6">
+                <h1 className="text-3xl md:text-4xl font-bold text-white mb-4">
+                  {event.title}
+                </h1>
+                <div className="flex flex-wrap gap-4 text-white text-sm">
+                  <div className="flex items-center gap-1">
+                    <Calendar className="h-4 w-4" />
                     <span>{formatRussianDate(event.start_at)}</span>
                   </div>
-                )}
-                {event.start_at && event.end_at && (
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-5 w-5" />
-                    <span>{formatTimeRange(event.start_at, event.end_at)}</span>
+                  <div className="flex items-center gap-1">
+                    <Clock className="h-4 w-4" />
+                    <span>{formatTimeFromTimestamp(event.start_at)}</span>
                   </div>
-                )}
-                {event.location && (
-                  <div className="flex items-center gap-2">
-                    <MapPin className="h-5 w-5" />
-                    <span>{event.location}</span>
-                  </div>
-                )}
+                  {event.location && (
+                    <div className="flex items-center gap-1">
+                      <MapPin className="h-4 w-4" />
+                      <span>{event.location}</span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Для мобильных */}
-      <div className="md:hidden bg-white dark:bg-dark-800 py-6 px-4">
-        <h1 className="text-3xl font-bold text-dark-900 dark:text-white mb-4">{event.title}</h1>
-        <div className="flex flex-col gap-3 text-dark-600 dark:text-dark-300">
-          {event.start_at && (
-            <div className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              <span>{formatRussianDate(event.start_at)}</span>
-            </div>
           )}
-          {event.start_at && event.end_at && (
-            <div className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
-              <span>{formatTimeRange(event.start_at, event.end_at)}</span>
-            </div>
-          )}
-          {event.location && (
-            <div className="flex items-center gap-2">
-              <MapPin className="h-5 w-5" />
-              <span>{event.location}</span>
-            </div>
-          )}
-        </div>
-      </div>
 
-      <main className="section bg-gray-50 dark:bg-dark-800">
-        <div className="container">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 space-y-8">
-              <div className="card p-6">
-                <h2 className="text-2xl font-semibold mb-4">О мероприятии</h2>
-                {renderEventDescription(event.description)}
-              </div>
-
-              {/* Видео (если есть) */}
-              {event.video_url && (
+          {/* Основной контент */}
+          <div className="container py-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Левая колонка - основная информация */}
+              <div className="lg:col-span-2 space-y-8">
+                {/* Описание */}
                 <div className="card p-6">
-                  <h2 className="text-2xl font-semibold mb-4">Видео</h2>
-                  <div className="aspect-video">
-                    <iframe
-                      src={event.video_url}
-                      className="w-full h-full rounded-lg"
-                      allowFullScreen
-                      title="Event video"
-                    />
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+                    О мероприятии
+                  </h2>
+                  <div className="prose dark:prose-invert max-w-none">
+                    {renderDescriptionWithLinks(event.description)}
                   </div>
                 </div>
-              )}
 
-              {/* Галерея фотографий (если есть) */}
-              {photoGallery.length > 0 && (
-                <div className="card p-6">
-                  <h2 className="text-2xl font-semibold mb-4">Фотогалерея</h2>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    {photoGallery.map((photo, index) => (
-                      <img
-                        key={index}
-                        src={photo}
-                        alt={`Фото ${index + 1}`}
-                        className="w-full h-32 object-cover rounded-lg"
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {event.event_type === 'Festival' && event.festival_program && event.festival_program.length > 0 && (
-                <div className="card p-6">
-                  <h2 className="text-2xl font-semibold mb-6">Программа фестиваля</h2>
-                  <div className="space-y-6">
-                    {event.festival_program
-                      .sort((a, b) => {
-                        try {
-                          return new Date(a.start_time).getTime() - new Date(b.start_time).getTime();
-                        } catch (e) {
-                          console.error('Error sorting program items:', e);
-                          return 0;
-                        }
-                      })
-                      .map((item, index) => {
-                        const speaker = item.lecturer_id 
-                          ? speakers.find(s => s.id === item.lecturer_id)
-                          : null;
-                          
+                {/* Спикеры */}
+                {speakers.length > 0 && (
+                  <div className="card p-6">
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
+                      Спикеры
+                    </h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {speakers.map((speaker) => {
+                        const mainPhoto = speaker.photos?.find(p => p.isMain) || speaker.photos?.[0];
                         return (
-                          <div key={index} className="border-b border-gray-200 dark:border-dark-700 pb-6 last:border-0 last:pb-0">
-                            <div className="flex flex-col md:flex-row gap-6">
-                              {item.image_url && (
-                                <div className="md:w-1/3">
-                                  <img 
-                                    src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/images/${item.image_url}`}
-                                    alt={item.title}
-                                    className="w-full h-auto rounded-lg object-cover"
-                                  />
-                                </div>
+                          <Link
+                            key={speaker.id}
+                            to={`/speakers/${speaker.id}`}
+                            className="group block"
+                          >
+                            <div className="flex gap-4 p-4 rounded-lg border border-gray-200 dark:border-gray-600 hover:border-primary-300 dark:hover:border-primary-600 transition-colors">
+                              {mainPhoto && (
+                                <img
+                                  src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/images/${mainPhoto.url}`}
+                                  alt={speaker.name}
+                                  className="w-16 h-16 object-cover rounded-full flex-shrink-0"
+                                />
                               )}
-                              <div className={`${item.image_url ? 'md:w-2/3' : 'w-full'}`}>
-                                <div className="flex flex-wrap items-center gap-4 mb-3">
-                                  <span className="text-sm font-medium px-3 py-1 bg-primary-100 dark:bg-primary-900/50 text-primary-800 dark:text-primary-200 rounded-full">
-                                    {formatTimeFromTimestamp(item.start_time)} - {formatTimeFromTimestamp(item.end_time)}
-                                  </span>
-                                </div>
-                                <h3 className="text-xl font-semibold mb-2">{item.title}</h3>
-                                <div className="prose dark:prose-invert max-w-none mb-4">
-                                  {renderDescriptionWithLinks(item.description)}
-                                </div>
-                                
-                                {speaker && (
-                                  <div className="mt-4 flex items-center gap-3">
-                                    <Link to={`/speakers/${speaker.id}`} className="shrink-0">
-                                      {speaker.photos?.find(p => p.isMain)?.url && (
-                                        <img
-                                          src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/images/${speaker.photos.find(p => p.isMain)?.url}`}
-                                          alt={speaker.name}
-                                          className="w-12 h-12 rounded-full object-cover"
-                                        />
-                                      )}
-                                    </Link>
-                                    <div>
-                                      <Link 
-                                        to={`/speakers/${speaker.id}`}
-                                        className="font-medium hover:text-primary-600 dark:hover:text-primary-400"
-                                      >
-                                        {speaker.name}
-                                      </Link>
-                                      <p className="text-sm text-dark-500 dark:text-dark-400">
-                                        {speaker.field_of_expertise}
-                                      </p>
-                                    </div>
-                                  </div>
-                                )}
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-semibold text-gray-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
+                                  {speaker.name}
+                                </h3>
+                                <p className="text-sm text-primary-600 dark:text-primary-400 mb-2">
+                                  {speaker.field_of_expertise}
+                                </p>
+                                <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-2">
+                                  {speaker.description}
+                                </p>
                               </div>
                             </div>
-                          </div>
+                          </Link>
                         );
                       })}
+                    </div>
                   </div>
-                </div>
-              )}
-              
-              {speakers.length > 0 && (
-                <div className="space-y-6">
-                  <h2 className="text-2xl font-semibold">Спикеры</h2>
-                  {speakers.map(speaker => (
-                    <div key={speaker.id} className="card p-6">
-                      <div className="flex items-start gap-4">
-                        <Link to={`/speakers/${speaker.id}`} className="shrink-0">
-                          <img
-                            src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/images/${speaker.photos.find(p => p.isMain)?.url}`}
-                            alt={speaker.name}
-                            className="w-16 h-16 rounded-full object-cover"
-                          />
-                        </Link>
-                        <div>
-                          <Link 
-                            to={`/speakers/${speaker.id}`}
-                            className="text-lg font-semibold hover:text-primary-600 dark:hover:text-primary-400"
-                          >
-                            {speaker.name}
-                          </Link>
-                          <p className="text-sm text-primary-600 dark:text-primary-400 mb-2">
-                            {speaker.field_of_expertise}
-                          </p>
-                          {renderDescriptionWithLinks(speaker.description)}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                )}
 
-            {!isEventPast && (
-              <div className="space-y-6">
-                <div className="card p-6">
-                  <div className="flex items-center justify-between mb-6">
-                    <div>
-                      <span className="block text-sm text-dark-500 dark:text-dark-400">Стоимость</span>
-                      <span className="text-2xl font-bold">
-                        {event.payment_type === 'free' 
-                          ? 'Бесплатно'
-                          : event.payment_type === 'donation'
-                            ? 'Донейшн'
-                            : event.price === null
-                              ? 'Онлайн оплата'
-                              : `${event.price} ${event.currency}`
-                        }
-                      </span>
+                {/* Фотогалерея */}
+                {photoGallery.length > 0 && (
+                  <div className="card p-6">
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
+                      Фотогалерея
+                    </h2>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                      {photoGallery.slice(0, 8).map((photo, index) => (
+                        <div key={index} className="aspect-square overflow-hidden rounded-lg">
+                          <img
+                            src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/images/${photo}`}
+                            alt={`Фото ${index + 1}`}
+                            className="w-full h-full object-cover hover:scale-105 transition-transform duration-300 cursor-pointer"
+                            onClick={() => window.open(`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/images/${photo}`, '_blank')}
+                          />
+                        </div>
+                      ))}
                     </div>
-                    <button
-                      onClick={() => setShowShareMenu(!showShareMenu)}
-                      className="p-2 hover:bg-gray-100 dark:hover:bg-dark-700 rounded-full relative"
-                    >
-                      <Share2 className="h-5 w-5" />
+                    {photoGallery.length > 8 && (
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-4 text-center">
+                        И еще {photoGallery.length - 8} фото...
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Видео */}
+                {event.video_url && (
+                  <div className="card p-6">
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
+                      Видео
+                    </h2>
+                    <div className="aspect-video rounded-lg overflow-hidden">
+                      {event.video_url.includes('youtube.com') || event.video_url.includes('youtu.be') ? (
+                        <iframe
+                          src={event.video_url.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')}
+                          title="Видео мероприятия"
+                          className="w-full h-full"
+                          allowFullScreen
+                        />
+                      ) : (
+                        <video
+                          src={event.video_url}
+                          controls
+                          className="w-full h-full"
+                        >
+                          Ваш браузер не поддерживает видео.
+                        </video>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Правая колонка - информация и регистрация */}
+              <div className="space-y-6">
+                {/* Информация о мероприятии */}
+                <div className="card p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                    Детали мероприятия
+                  </h3>
+                  <div className="space-y-3 text-sm">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-gray-500" />
+                      <span>{formatRussianDate(event.start_at)}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-gray-500" />
+                      <span>{formatTimeFromTimestamp(event.start_at)}</span>
+                    </div>
+                    {event.location && (
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-gray-500" />
+                        <span>{event.location}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <Users className="h-4 w-4 text-gray-500" />
+                      <span>{event.age_category}</span>
+                    </div>
+                    {event.languages?.length > 0 && (
+                      <div className="flex items-center gap-2">
+                        <Globe className="h-4 w-4 text-gray-500" />
+                        <span>{event.languages.join(', ')}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Поделиться */}
+                  <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-600">
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowShareMenu(!showShareMenu)}
+                        className="flex items-center gap-2 w-full px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
+                      >
+                        <Share2 className="h-4 w-4" />
+                        Поделиться
+                      </button>
                       
                       {showShareMenu && (
-                        <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-dark-800 rounded-lg shadow-lg py-2 z-50">
+                        <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg z-10">
                           <button
                             onClick={() => handleShare('telegram')}
-                            className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-dark-700"
+                            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 first:rounded-t-lg"
                           >
                             Telegram
                           </button>
                           <button
                             onClick={() => handleShare('vk')}
-                            className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-dark-700"
+                            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700"
                           >
                             VKontakte
                           </button>
                           <button
                             onClick={() => handleShare('copy')}
-                            className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-dark-700"
+                            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 last:rounded-b-lg"
                           >
                             Копировать ссылку
                           </button>
                         </div>
                       )}
-                    </button>
-                  </div>
-
-                  {event.payment_widget_id && (
-                    <div 
-                      className="mb-4"
-                      dangerouslySetInnerHTML={{ __html: event.payment_widget_id }}
-                    />
-                  )}
-
-                  <button 
-                    onClick={handleRegisterClick}
-                    className="w-full btn-primary mb-4"
-                  >
-                    {event.price === null && event.payment_link ? 'Купить онлайн' : 'Зарегистрироваться'}
-                  </button>
-
-                  <div className="space-y-4 text-sm">
-                    {event.languages?.length > 0 && (
-                      <div className="flex items-center gap-2 text-dark-500 dark:text-dark-400">
-                        <Globe className="h-5 w-5" />
-                        <span>{event.languages.join(', ')}</span>
-                      </div>
-                    )}
+                    </div>
                   </div>
                 </div>
 
-                {event.location && (
-                  <div className="card p-6">
-                    <p className="font-semibold mb-4">Место проведения</p>
-                    <div className="space-y-2">
-                      <p className="text-dark-600 dark:text-dark-300">{event.location}</p>
+                {/* Блок регистрации */}
+                {!isEventPast && (
+                  <EventRegistrationBlock
+                    event={{
+                      id: event.id,
+                      title: event.title,
+                      start_at: event.start_at,
+                      location: event.location || '',
+                      price: event.price || 0,
+                      currency: event.currency || 'RSD',
+                      payment_type: event.payment_type,
+                      payment_link: event.payment_link,
+                      oblakkarte_data_event_id: event.oblakkarte_data_event_id,
+                      registrations: event.registrations
+                    }}
+                    onRegistrationSuccess={handleRegistrationSuccess}
+                  />
+                )}
+
+                {/* Информация о прошедшем событии */}
+                {isEventPast && (
+                  <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg p-6">
+                    <div className="text-center">
+                      <Calendar className="h-8 w-8 text-gray-400 mx-auto mb-3" />
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                        Мероприятие завершено
+                      </h3>
+                      <p className="text-gray-600 dark:text-gray-300 text-sm">
+                        Это мероприятие уже прошло. Следите за нашими новыми событиями!
+                      </p>
+                      <Link
+                        to="/events"
+                        className="inline-block mt-4 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm"
+                      >
+                        Смотреть другие мероприятия
+                      </Link>
                     </div>
                   </div>
                 )}
               </div>
-            )}
+            </div>
           </div>
         </div>
       </main>
-
-// В EventDetailsPage.tsx - обновленная передача пропсов в RegistrationModal
-<RegistrationModal
-  isOpen={showRegistrationModal}
-  onClose={() => setShowRegistrationModal(false)}
-  event={{
-    id: event.id,
-    title: event.title,
-    start_at: event.start_at,
-    location: event.location || '',
-    price: event.price || 0,
-    currency: event.currency || 'RUB',
-    payment_type: event.payment_type,
-    payment_link: event.payment_link,
-    payment_widget_id: event.payment_widget_id,
-    widget_chooser: event.widget_chooser,
-    oblakkarte_data_event_id: event.oblakkarte_data_event_id, // Добавляем это поле!
-    couple_discount: event.couple_discount,
-    child_half_price: event.child_half_price,
-    age_category: event.age_category,
-    registrations: event.registrations
-  }}
-/>
-
-<PaymentOptionsModal
-  isOpen={showPaymentOptions}
-  onClose={() => setShowPaymentOptions(false)}
-  onSelectOption={handlePaymentOptionSelect}
-  hasOnlinePayment={event.payment_type !== 'free' && event.payment_type !== 'donation'}
-  paymentType={event.widget_chooser ? 'widget' : 'link'}
-  paymentLink={event.payment_link}
-  oblakkarteDataEventId={event.oblakkarte_data_event_id}
-/>
     </Layout>
   );
 };
